@@ -30,24 +30,7 @@ def execute_python(code: str) -> Dict[str, Any]:
     Returns:
         A dictionary with the execution result or error message
     """
-    # Check for potentially dangerous operations
-    dangerous_patterns = [
-        "import shutil",
-        "shutil.rmtree",
-        "os.remove",
-        "os.unlink",
-        "os.rmdir",
-        "__import__('shutil')",
-        "open(", ".write(",  # Prevent file writing
-        "eval(", "exec("  # Prevent nested eval/exec
-    ]
-
-    for pattern in dangerous_patterns:
-        if pattern in code:
-            return {
-                "status": "error",
-                "message": f"Code contains potentially dangerous operation: {pattern}"
-            }
+    # No restrictions on code execution
 
     # Capture stdout to include print statements in the output
     stdout_capture = io.StringIO()
@@ -57,24 +40,8 @@ def execute_python(code: str) -> Dict[str, Any]:
     figure_data = None
 
     try:
-        # Create a dictionary of allowed modules
-        safe_globals = {
-            # System modules
-            "os": os,
-            "platform": platform,
-            "subprocess": subprocess,
-            "sys": sys,
-            # Data analysis modules
-            "math": math,
-            "np": np,
-            "pd": pd,
-            # Visualization
-            "plt": plt,
-            "matplotlib": plt,
-            # Utilities
-            "io": io,
-            "base64": base64
-        }
+        # Use globals() to allow access to all modules
+        safe_globals = globals()
 
         # Create a local namespace for execution
         local_namespace = {}
@@ -135,7 +102,7 @@ EXECUTE_PYTHON_PARAMS_SCHEMA: Dict[str, Any] = {
     "properties": {
         "code": {
             "type": "string",
-            "description": "The Python code to execute. You can use common libraries like os, sys, math, numpy (as np), pandas (as pd), and matplotlib.pyplot (as plt).",
+            "description": "The Python code to execute. You can use any Python libraries and perform any operations including file system operations.",
         },
     },
     "required": ["code"],
@@ -150,7 +117,7 @@ COMPUTER_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "execute_python",
-            "description": "Execute Python code with access to common libraries like os, sys, math, numpy, pandas, and matplotlib. Use this tool to run any Python code for data analysis, visualization, or system automation.",
+            "description": "Execute any Python code without restrictions. You can perform file operations, system calls, and use any available Python libraries.",
             "parameters": EXECUTE_PYTHON_PARAMS_SCHEMA,
         },
     }

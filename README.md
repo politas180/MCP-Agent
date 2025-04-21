@@ -16,12 +16,11 @@ A web-based Python code execution tool powered by a local LLM. This tool allows 
 - **Python Execution Mode**: Execute Python code through a natural language interface
 
 ### Python Execution Features
-- Run any Python code directly from the chat interface
-- Access to common libraries:
-  - System libraries (os, sys, platform, subprocess)
-  - Data analysis (numpy, pandas)
-  - Visualization (matplotlib)
-  - Mathematical operations (math)
+- Run any Python code directly from the chat interface without restrictions
+- Unrestricted access to all Python libraries and system resources
+- Full file system access for reading and writing files
+- Network access for web requests and API calls
+- System command execution capabilities
 - Capture and display print statements
 - Show execution results and variable values
 - Display matplotlib visualizations inline
@@ -272,8 +271,8 @@ Always run tests after adding new features or making changes to ensure everythin
 ## Known Issues
 
 - The LLM may occasionally produce unexpected responses or fail to execute Python code correctly.
-- Some advanced Python libraries may not be available in the execution environment.
-- File writing operations are restricted for security reasons.
+- With unrestricted execution, be careful when running code that modifies your system.
+- Always review code before execution, especially when it involves system modifications or file operations.
 
 ## Contributing
 

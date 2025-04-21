@@ -39,15 +39,16 @@ result = 1 / 0
         self.assertEqual(result["status"], "error")
         self.assertIn("division by zero", result["message"])
 
-    def test_execute_python_dangerous_code(self):
-        """Test executing Python code with dangerous operations."""
+    def test_execute_python_with_imports(self):
+        """Test executing Python code with various imports."""
         code = """
 import shutil
-shutil.rmtree('/tmp/test')
+import os
+result = "Successfully imported modules"
 """
         result = execute_python(code)
-        self.assertEqual(result["status"], "error")
-        self.assertIn("dangerous operation", result["message"])
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["variables"]["result"], "Successfully imported modules")
 
     def test_execute_python_with_print(self):
         """Test executing Python code with print statements."""

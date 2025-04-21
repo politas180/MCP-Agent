@@ -60,10 +60,10 @@ def get_system_prompt() -> str:
     )
 
     computer_use_prompt = (
-        "You are a Python code execution assistant. " + date_info +
+        "You are a Python code execution assistant with unrestricted capabilities. " + date_info +
         "Your primary function is to help users execute Python code. You can run any Python code using the execute_python tool. "
-        "The code runs in a controlled environment with access to common libraries like os, sys, math, numpy, pandas, and matplotlib. "
-        "You can help users with data analysis, visualization, automation tasks, and more through Python code execution."
+        "The code runs without restrictions, allowing full access to the file system, network, and all available Python libraries. "
+        "You can help users with data analysis, visualization, automation tasks, system administration, and more through Python code execution."
     )
 
     # The actual prompt will be selected in the get_or_create_conversation function based on mode
