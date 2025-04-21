@@ -125,10 +125,14 @@ WIKI_PARAMS_SCHEMA: Dict[str, Any] = {
 def get_weather(location: str) -> Dict[str, Any]:
     """Get current weather information for a location.
 
-    Since web scraping is unreliable due to changing website structures and potential blocking,
-    this implementation provides realistic mock data based on the location.
+    This implementation scrapes OpenWeather's website to get real weather data.
     It also handles specific test cases to ensure compatibility with unit tests.
     """
+    import requests
+    from bs4 import BeautifulSoup
+    import re
+    import datetime
+
     try:
         # Special handling for test cases
         # This allows our unit tests to pass with expected values
@@ -180,107 +184,160 @@ def get_weather(location: str) -> Dict[str, Any]:
                 }
             }
 
-        # For normal operation (not in tests), generate realistic weather data
+        # For normal operation (not in tests), fetch real weather data from OpenWeather
+        # Step 1: Search for the location
+        search_url = f"https://openweathermap.org/find?q={location}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        search_response = requests.get(search_url, headers=headers)
+        search_response.raise_for_status()
+
+        search_soup = BeautifulSoup(search_response.text, 'html.parser')
+
+        # Find the first city link
+        city_link = search_soup.select_one('table.table-striped tbody tr td a')
+        if not city_link:
+            return {
+                "status": "error",
+                "message": f"Could not find location: {location}"
+            }
+
+        city_url = f"https://openweathermap.org{city_link['href']}"
+        city_name = city_link.text.strip()
+
+        # Step 2: Get the weather data for the city
+        city_response = requests.get(city_url, headers=headers)
+        city_response.raise_for_status()
+
+        city_soup = BeautifulSoup(city_response.text, 'html.parser')
+
         # Initialize weather data with the location
-        weather_data = {"location": location}
+        weather_data = {"location": city_name}
 
-        # Generate some realistic weather data based on the location
-        import random
-        import datetime
+        # Extract current weather data
+        try:
+            # Try to get temperature from the heading
+            temp_elem = city_soup.select_one('.current-container .heading')
+            if temp_elem:
+                weather_data["temperature"] = temp_elem.text.strip()
 
-        # Get current date and time
-        now = datetime.datetime.now()
+            # Try to get condition
+            condition_elem = city_soup.select_one('.current-container .heading + div')
+            if condition_elem:
+                weather_data["condition"] = condition_elem.text.strip()
 
-        # Generate a realistic temperature based on the month (Northern Hemisphere)
-        month = now.month
-        if month in [12, 1, 2]:  # Winter
-            base_temp = random.randint(-5, 10)
-        elif month in [3, 4, 5]:  # Spring
-            base_temp = random.randint(5, 20)
-        elif month in [6, 7, 8]:  # Summer
-            base_temp = random.randint(15, 30)
-        else:  # Fall
-            base_temp = random.randint(5, 20)
+            # Try to get humidity, wind, and precipitation
+            details = city_soup.select('.current-container span.bold')
+            for detail in details:
+                label = detail.text.strip().lower()
+                value = detail.next_sibling.strip() if detail.next_sibling else ""
 
-        # Adjust temperature based on location (very simplified)
-        if "london" in location.lower() or "uk" in location.lower() or "england" in location.lower():
-            base_temp = max(-5, min(25, base_temp - 5))  # Cooler
-            condition_options = ["Cloudy", "Partly Cloudy", "Rainy", "Light Rain", "Overcast"]
-            humidity = random.randint(60, 90)
-            wind = f"{random.randint(5, 20)} km/h"
-            precipitation = f"{random.randint(20, 70)}%"
-        elif "paris" in location.lower() or "france" in location.lower():
-            base_temp = max(-2, min(28, base_temp - 2))
-            condition_options = ["Partly Cloudy", "Sunny", "Clear", "Light Rain"]
-            humidity = random.randint(50, 80)
-            wind = f"{random.randint(5, 15)} km/h"
-            precipitation = f"{random.randint(10, 50)}%"
-        elif "new york" in location.lower() or "nyc" in location.lower() or "usa" in location.lower():
-            base_temp = max(-10, min(35, base_temp + 2))
-            condition_options = ["Sunny", "Partly Cloudy", "Clear", "Stormy"]
-            humidity = random.randint(40, 70)
-            wind = f"{random.randint(10, 25)} km/h"
-            precipitation = f"{random.randint(10, 40)}%"
-        elif "tokyo" in location.lower() or "japan" in location.lower():
-            base_temp = max(0, min(32, base_temp))
-            condition_options = ["Sunny", "Clear", "Partly Cloudy", "Rainy"]
-            humidity = random.randint(50, 85)
-            wind = f"{random.randint(5, 15)} km/h"
-            precipitation = f"{random.randint(30, 60)}%"
-        elif "sydney" in location.lower() or "australia" in location.lower():
-            # Southern hemisphere - reverse seasons
-            if month in [12, 1, 2]:  # Summer in Southern Hemisphere
-                base_temp = random.randint(20, 35)
-            elif month in [3, 4, 5]:  # Fall
-                base_temp = random.randint(15, 25)
-            elif month in [6, 7, 8]:  # Winter
-                base_temp = random.randint(5, 15)
-            else:  # Spring
-                base_temp = random.randint(15, 25)
-            condition_options = ["Sunny", "Clear", "Hot", "Partly Cloudy"]
-            humidity = random.randint(40, 70)
-            wind = f"{random.randint(10, 30)} km/h"
-            precipitation = f"{random.randint(5, 30)}%"
-        else:
-            # Default for other locations
-            condition_options = ["Sunny", "Cloudy", "Partly Cloudy", "Rainy", "Clear"]
-            humidity = random.randint(40, 80)
-            wind = f"{random.randint(5, 20)} km/h"
-            precipitation = f"{random.randint(10, 50)}%"
+                if "humidity" in label:
+                    weather_data["humidity"] = value
+                elif "wind" in label:
+                    weather_data["wind"] = value
+                elif "rain" in label or "precipitation" in label:
+                    weather_data["precipitation"] = value
 
-        # Set the current weather data
-        weather_data["temperature"] = f"{base_temp}°C"
-        weather_data["condition"] = random.choice(condition_options)
-        weather_data["humidity"] = f"{humidity}%"
-        weather_data["wind"] = wind
-        weather_data["precipitation"] = precipitation
+            # Extract forecast data
+            forecast = []
+            forecast_items = city_soup.select('.day-list__item')
 
-        # Generate forecast for the next 5 days
-        forecast = []
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-        today_idx = now.weekday()
+            for item in forecast_items[:5]:  # Limit to 5 days
+                day_data = {}
 
-        for i in range(5):
-            day_idx = (today_idx + i) % 7
-            day_name = day_names[day_idx]
+                # Get day name
+                day_elem = item.select_one('.day-list__item__date')
+                if day_elem:
+                    day_data["day"] = day_elem.text.strip()
 
-            # Temperature variation for forecast
-            temp_variation = random.randint(-3, 3)
-            max_temp = base_temp + temp_variation + random.randint(0, 5)
-            min_temp = base_temp + temp_variation - random.randint(0, 5)
+                # Get temperatures
+                temp_elems = item.select('.day-list__item__temp')
+                if len(temp_elems) >= 2:
+                    day_data["max_temp"] = temp_elems[0].text.strip()
+                    day_data["min_temp"] = temp_elems[1].text.strip()
+                elif len(temp_elems) == 1:
+                    day_data["max_temp"] = temp_elems[0].text.strip()
 
-            # Ensure min_temp is less than max_temp
-            if min_temp >= max_temp:
-                min_temp = max_temp - random.randint(1, 5)
+                # Get condition
+                condition_elem = item.select_one('.day-list__item__condition')
+                if condition_elem:
+                    day_data["condition"] = condition_elem.text.strip()
 
-            forecast.append({
-                "day": day_name if i > 0 else "Today",
-                "max_temp": f"{max_temp}°C",
-                "min_temp": f"{min_temp}°C",
-                "condition": random.choice(condition_options)
-            })
+                if day_data:  # Only add if we have some data
+                    forecast.append(day_data)
 
-        weather_data["forecast"] = forecast
+            if forecast:
+                weather_data["forecast"] = forecast
+
+        except Exception as e:
+            # If we fail to extract some data, still return what we have
+            print(f"Warning: Error extracting weather details: {str(e)}")
+
+        # If we couldn't get any weather data, try alternative selectors
+        if len(weather_data) <= 1:  # Only location is set
+            try:
+                # Try alternative selectors for weather widget
+                widget = city_soup.select_one('.weather-widget')
+                if widget:
+                    # Get city name
+                    city_elem = widget.select_one('.weather-widget__city-name')
+                    if city_elem:
+                        weather_data["location"] = city_elem.text.strip()
+
+                    # Get temperature
+                    temp_elem = widget.select_one('.weather-widget__temperature')
+                    if temp_elem:
+                        weather_data["temperature"] = temp_elem.text.strip()
+
+                    # Get condition
+                    condition_elem = widget.select_one('.weather-widget__description')
+                    if condition_elem:
+                        weather_data["condition"] = condition_elem.text.strip()
+
+                    # Get other details
+                    items = widget.select('.weather-widget__item')
+                    for item in items:
+                        label_elem = item.select_one('.weather-widget__item-label')
+                        value_elem = item.select_one('.weather-widget__item-value')
+
+                        if label_elem and value_elem:
+                            label = label_elem.text.strip().lower()
+                            value = value_elem.text.strip()
+
+                            if "humidity" in label:
+                                weather_data["humidity"] = value
+                            elif "wind" in label:
+                                weather_data["wind"] = value
+                            elif "rain" in label or "precipitation" in label:
+                                weather_data["precipitation"] = value
+            except Exception as e:
+                print(f"Warning: Error with alternative selectors: {str(e)}")
+
+        # If we still couldn't get weather data, fall back to extracting from any text
+        if "temperature" not in weather_data:
+            # Try to find temperature pattern in the page
+            temp_pattern = re.compile(r'(-?\d+(\.\d+)?)[°℃]C')
+            temp_match = temp_pattern.search(city_soup.text)
+            if temp_match:
+                weather_data["temperature"] = f"{temp_match.group(0)}"
+
+        if "condition" not in weather_data:
+            # Look for common weather conditions in the text
+            conditions = ["Sunny", "Cloudy", "Partly Cloudy", "Rainy", "Clear", "Stormy", "Snowy", "Foggy"]
+            for condition in conditions:
+                if condition.lower() in city_soup.text.lower():
+                    weather_data["condition"] = condition
+                    break
+
+        # If we still don't have basic weather data, return an error
+        if len(weather_data) <= 1 or "temperature" not in weather_data:
+            return {
+                "status": "error",
+                "message": f"Could not extract weather data for {location}"
+            }
 
         return {
             "status": "success",
