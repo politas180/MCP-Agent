@@ -14,6 +14,8 @@ dependencies:
   - pytest-mock
   - numpy
   - sympy
+  - pandas
+  - matplotlib
   - pip:
     - wikipedia
     - duckduckgo-search

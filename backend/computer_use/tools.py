@@ -1,10 +1,16 @@
-"""Computer Use tools implementation."""
+"""Python code execution tool implementation."""
 from __future__ import annotations
 
 import os
 import platform
 import subprocess
 import sys
+import math
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
 from typing import Dict, List, Any
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -13,14 +19,14 @@ from typing import Dict, List, Any
 
 def execute_python(code: str) -> Dict[str, Any]:
     """Execute Python code in a controlled environment.
-    
+
     This tool allows executing Python code with access to common libraries for
-    computer control like os, subprocess, platform, etc. It provides a sandbox
-    for computer automation tasks.
-    
+    data analysis, visualization, and system automation. It provides a sandbox
+    for running Python code through a natural language interface.
+
     Args:
         code: The Python code to execute
-        
+
     Returns:
         A dictionary with the execution result or error message
     """
@@ -32,37 +38,85 @@ def execute_python(code: str) -> Dict[str, Any]:
         "os.unlink",
         "os.rmdir",
         "__import__('shutil')",
+        "open(", ".write(",  # Prevent file writing
+        "eval(", "exec("  # Prevent nested eval/exec
     ]
-    
+
     for pattern in dangerous_patterns:
         if pattern in code:
             return {
                 "status": "error",
                 "message": f"Code contains potentially dangerous operation: {pattern}"
             }
-    
+
+    # Capture stdout to include print statements in the output
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+
+    # Capture matplotlib figures if generated
+    figure_data = None
+
     try:
         # Create a dictionary of allowed modules
         safe_globals = {
+            # System modules
             "os": os,
             "platform": platform,
             "subprocess": subprocess,
             "sys": sys,
+            # Data analysis modules
+            "math": math,
+            "np": np,
+            "pd": pd,
+            # Visualization
+            "plt": plt,
+            "matplotlib": plt,
+            # Utilities
+            "io": io,
+            "base64": base64
         }
-        
+
         # Create a local namespace for execution
         local_namespace = {}
-        
-        # Execute the code
-        exec(code, safe_globals, local_namespace)
-        
+
+        # Redirect stdout/stderr
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        sys.stdout = stdout_capture
+        sys.stderr = stderr_capture
+
+        try:
+            # Execute the code
+            exec(code, safe_globals, local_namespace)
+
+            # Check if there are any matplotlib figures to capture
+            if plt.get_fignums():
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png')
+                buf.seek(0)
+                figure_data = base64.b64encode(buf.read()).decode('utf-8')
+                plt.close('all')
+        finally:
+            # Restore stdout/stderr
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+
+        # Get stdout and stderr content
+        stdout_content = stdout_capture.getvalue()
+        stderr_content = stderr_capture.getvalue()
+
         # Prepare the result
         result = {
             "status": "success",
-            "output": str(local_namespace.get("result", "Code executed successfully")),
-            "variables": {k: str(v) for k, v in local_namespace.items() if not k.startswith("_")}
+            "output": stdout_content if stdout_content else str(local_namespace.get("result", "Code executed successfully")),
+            "variables": {k: str(v) for k, v in local_namespace.items() if not k.startswith("_")},
+            "error_output": stderr_content if stderr_content else None
         }
-        
+
+        # Add figure data if available
+        if figure_data:
+            result["figure"] = figure_data
+
         return result
     except Exception as e:
         return {
@@ -70,131 +124,7 @@ def execute_python(code: str) -> Dict[str, Any]:
             "message": f"Error executing code: {str(e)}"
         }
 
-def get_system_info() -> Dict[str, Any]:
-    """Get information about the system.
-    
-    Returns:
-        A dictionary with system information
-    """
-    try:
-        info = {
-            "platform": platform.platform(),
-            "system": platform.system(),
-            "release": platform.release(),
-            "version": platform.version(),
-            "machine": platform.machine(),
-            "processor": platform.processor(),
-            "python_version": platform.python_version(),
-            "username": os.getlogin(),
-            "home_directory": os.path.expanduser("~"),
-            "current_directory": os.getcwd(),
-        }
-        
-        return {
-            "status": "success",
-            "info": info
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error getting system info: {str(e)}"
-        }
 
-def list_files(path: str = ".") -> Dict[str, Any]:
-    """List files and directories in the specified path.
-    
-    Args:
-        path: The path to list files from (default: current directory)
-        
-    Returns:
-        A dictionary with the list of files and directories
-    """
-    try:
-        # Expand user directory if needed
-        if path.startswith("~"):
-            path = os.path.expanduser(path)
-            
-        # Get absolute path
-        abs_path = os.path.abspath(path)
-        
-        # Check if path exists
-        if not os.path.exists(abs_path):
-            return {
-                "status": "error",
-                "message": f"Path does not exist: {abs_path}"
-            }
-            
-        # List files and directories
-        items = os.listdir(abs_path)
-        
-        # Separate files and directories
-        files = []
-        directories = []
-        
-        for item in items:
-            item_path = os.path.join(abs_path, item)
-            if os.path.isdir(item_path):
-                directories.append(item)
-            else:
-                files.append(item)
-                
-        return {
-            "status": "success",
-            "path": abs_path,
-            "files": files,
-            "directories": directories
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error listing files: {str(e)}"
-        }
-
-def read_file(path: str) -> Dict[str, Any]:
-    """Read the contents of a file.
-    
-    Args:
-        path: The path to the file to read
-        
-    Returns:
-        A dictionary with the file contents
-    """
-    try:
-        # Expand user directory if needed
-        if path.startswith("~"):
-            path = os.path.expanduser(path)
-            
-        # Get absolute path
-        abs_path = os.path.abspath(path)
-        
-        # Check if path exists
-        if not os.path.exists(abs_path):
-            return {
-                "status": "error",
-                "message": f"File does not exist: {abs_path}"
-            }
-            
-        # Check if it's a file
-        if not os.path.isfile(abs_path):
-            return {
-                "status": "error",
-                "message": f"Path is not a file: {abs_path}"
-            }
-            
-        # Read file contents
-        with open(abs_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            
-        return {
-            "status": "success",
-            "path": abs_path,
-            "content": content
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error reading file: {str(e)}"
-        }
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Tool schemas
@@ -205,39 +135,10 @@ EXECUTE_PYTHON_PARAMS_SCHEMA: Dict[str, Any] = {
     "properties": {
         "code": {
             "type": "string",
-            "description": "The Python code to execute.",
+            "description": "The Python code to execute. You can use common libraries like os, sys, math, numpy (as np), pandas (as pd), and matplotlib.pyplot (as plt).",
         },
     },
     "required": ["code"],
-}
-
-GET_SYSTEM_INFO_PARAMS_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {},
-    "required": [],
-}
-
-LIST_FILES_PARAMS_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "path": {
-            "type": "string",
-            "description": "The path to list files from (default: current directory).",
-            "default": ".",
-        },
-    },
-    "required": [],
-}
-
-READ_FILE_PARAMS_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "path": {
-            "type": "string",
-            "description": "The path to the file to read.",
-        },
-    },
-    "required": ["path"],
 }
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -249,41 +150,14 @@ COMPUTER_TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "execute_python",
-            "description": "Execute Python code for computer control tasks.",
+            "description": "Execute Python code with access to common libraries like os, sys, math, numpy, pandas, and matplotlib. Use this tool to run any Python code for data analysis, visualization, or system automation.",
             "parameters": EXECUTE_PYTHON_PARAMS_SCHEMA,
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_system_info",
-            "description": "Get information about the system.",
-            "parameters": GET_SYSTEM_INFO_PARAMS_SCHEMA,
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_files",
-            "description": "List files and directories in the specified path.",
-            "parameters": LIST_FILES_PARAMS_SCHEMA,
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read the contents of a file.",
-            "parameters": READ_FILE_PARAMS_SCHEMA,
-        },
-    },
+    }
 ]
 
 COMPUTER_TOOL_IMPLS = {
-    "execute_python": execute_python,
-    "get_system_info": get_system_info,
-    "list_files": list_files,
-    "read_file": read_file,
+    "execute_python": execute_python
 }
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -294,67 +168,31 @@ def pretty_print_execute_python_results(result: Dict[str, Any]) -> str:
     """Format execute_python results for display."""
     if result.get("status") == "error":
         return f"Error: {result.get('message', 'Unknown error')}"
-    
+
     output = result.get("output", "")
     variables = result.get("variables", {})
-    
-    formatted = f"Output: {output}\n\n"
-    
+    error_output = result.get("error_output")
+    figure = result.get("figure")
+
+    formatted = ""
+
+    # Add output
+    if output and output != "Code executed successfully":
+        formatted += f"{output}\n\n"
+
+    # Add error output if any
+    if error_output:
+        formatted += f"Errors/Warnings:\n{error_output}\n\n"
+
+    # Add figure if available
+    if figure:
+        formatted += f"<img src=\"data:image/png;base64,{figure}\" />\n\n"
+
+    # Add variables if any
     if variables:
         formatted += "Variables:\n"
         for name, value in variables.items():
-            formatted += f"- {name}: {value}\n"
-    
-    return formatted
+            if name != "result":
+                formatted += f"- {name}: {value}\n"
 
-def pretty_print_system_info(result: Dict[str, Any]) -> str:
-    """Format system_info results for display."""
-    if result.get("status") == "error":
-        return f"Error: {result.get('message', 'Unknown error')}"
-    
-    info = result.get("info", {})
-    
-    formatted = "System Information:\n"
-    for key, value in info.items():
-        formatted += f"- {key}: {value}\n"
-    
-    return formatted
-
-def pretty_print_list_files(result: Dict[str, Any]) -> str:
-    """Format list_files results for display."""
-    if result.get("status") == "error":
-        return f"Error: {result.get('message', 'Unknown error')}"
-    
-    path = result.get("path", "")
-    directories = result.get("directories", [])
-    files = result.get("files", [])
-    
-    formatted = f"Contents of {path}:\n\n"
-    
-    if directories:
-        formatted += "Directories:\n"
-        for directory in sorted(directories):
-            formatted += f"- 📁 {directory}\n"
-        formatted += "\n"
-    
-    if files:
-        formatted += "Files:\n"
-        for file in sorted(files):
-            formatted += f"- 📄 {file}\n"
-    
-    if not directories and not files:
-        formatted += "Directory is empty."
-    
-    return formatted
-
-def pretty_print_read_file(result: Dict[str, Any]) -> str:
-    """Format read_file results for display."""
-    if result.get("status") == "error":
-        return f"Error: {result.get('message', 'Unknown error')}"
-    
-    path = result.get("path", "")
-    content = result.get("content", "")
-    
-    formatted = f"Contents of file {path}:\n\n```\n{content}\n```"
-    
     return formatted

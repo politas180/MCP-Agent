@@ -20,10 +20,9 @@ from tools import (TOOL_IMPLS, TOOLS, pretty_print_search_results,
                   pretty_print_wiki_results, pretty_print_weather_results,
                   pretty_print_calculator_results)
 
-# Import Computer Use tools
+# Import Python execution tool
 from computer_use import (COMPUTER_TOOLS, COMPUTER_TOOL_IMPLS,
-                        pretty_print_execute_python_results, pretty_print_system_info,
-                        pretty_print_list_files, pretty_print_read_file)
+                        pretty_print_execute_python_results)
 
 app = Flask(__name__)
 app.secret_key = "mcp-agent-secret-key"  # For session management
@@ -52,22 +51,38 @@ def get_system_prompt() -> str:
         f"- Current timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     )
 
-    return (
+    # Different prompts based on mode
+    standard_prompt = (
         "You are an intelligent assistant. " + date_info +
         "If you need to perform a web search, Wikipedia search, get weather information, or perform calculations, "
         "call the appropriate tool. The calculator tool can evaluate mathematical expressions using math, numpy, and sympy libraries. "
         "Use as many tool calls as needed until you have the information required to answer the user conclusively."
     )
 
+    computer_use_prompt = (
+        "You are a Python code execution assistant. " + date_info +
+        "Your primary function is to help users execute Python code. You can run any Python code using the execute_python tool. "
+        "The code runs in a controlled environment with access to common libraries like os, sys, math, numpy, pandas, and matplotlib. "
+        "You can help users with data analysis, visualization, automation tasks, and more through Python code execution."
+    )
+
+    # The actual prompt will be selected in the get_or_create_conversation function based on mode
+    return {"standard": standard_prompt, "computer_use": computer_use_prompt}
+
 def get_or_create_conversation(session_id: str) -> List[Dict[str, Any]]:
     """Get or create a conversation for the given session ID."""
+    # Get the appropriate prompt based on mode
+    prompts = get_system_prompt()
+    is_computer_use = session_id in COMPUTER_USE_SESSIONS
+    prompt = prompts["computer_use"] if is_computer_use else prompts["standard"]
+
     if session_id not in CONVERSATIONS:
         CONVERSATIONS[session_id] = [
-            {"role": "system", "content": get_system_prompt()}
+            {"role": "system", "content": prompt}
         ]
     else:
-        # Update the system prompt with current time
-        CONVERSATIONS[session_id][0] = {"role": "system", "content": get_system_prompt()}
+        # Update the system prompt with current time and mode
+        CONVERSATIONS[session_id][0] = {"role": "system", "content": prompt}
 
     return CONVERSATIONS[session_id]
 
@@ -216,15 +231,9 @@ def chat():
                             tool_result_text = pretty_print_weather_results(result)
                         elif name == "calculator":
                             tool_result_text = pretty_print_calculator_results(result)
-                        # Computer Use tools
+                        # Python execution tool
                         elif name == "execute_python":
                             tool_result_text = pretty_print_execute_python_results(result)
-                        elif name == "get_system_info":
-                            tool_result_text = pretty_print_system_info(result)
-                        elif name == "list_files":
-                            tool_result_text = pretty_print_list_files(result)
-                        elif name == "read_file":
-                            tool_result_text = pretty_print_read_file(result)
                         else:
                             tool_result_text = json.dumps(result)
 
@@ -337,8 +346,8 @@ def manage_tools():
 
 @app.route('/api/computer-use-tools', methods=['GET'])
 def computer_use_tools():
-    """Get the list of Computer Use tools."""
-    # Return the list of Computer Use tools
+    """Get the Python execution tool."""
+    # Return the Python execution tool
     tools_info = []
     for tool in COMPUTER_TOOLS:
         name = tool['function']['name']

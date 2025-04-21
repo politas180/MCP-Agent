@@ -1,6 +1,6 @@
-# MCP Agent Web Application
+# MCP Python Executor
 
-A web-based intelligent assistant powered by a local LLM that can perform web searches, Wikipedia searches, get weather information, perform calculations, and even control your computer with Python.
+A web-based Python code execution tool powered by a local LLM. This tool allows you to run Python code through a natural language interface.
 
 ## Features
 
@@ -13,23 +13,18 @@ A web-based intelligent assistant powered by a local LLM that can perform web se
 ### Operation Modes
 - **Normal Mode**: Streamlined interface for everyday use
 - **Advanced Mode**: Detailed view with debug and timing information
-- **Computer Use Mode**: Special mode that allows controlling your computer with Python
+- **Python Execution Mode**: Execute Python code through a natural language interface
 
-### Tool Integration
-- **Web Search**: Search the web using DuckDuckGo
-- **Wikipedia Search**: Search Wikipedia and get article summaries
-- **Weather**: Get current weather and forecast for a location
-- **Calculator**: Evaluate mathematical expressions with support for:
-  - Basic arithmetic operations
-  - Advanced math functions (via Python's math library)
-  - Scientific computing (via NumPy)
-  - Symbolic mathematics (via SymPy)
-
-### Computer Use Tools (in Computer Use Mode)
-- **Python Execution**: Run Python code directly from the chat
-- **System Information**: Get details about your operating system and hardware
-- **File Explorer**: List files and directories in any path
-- **File Reader**: Read the contents of files
+### Python Execution Features
+- Run any Python code directly from the chat interface
+- Access to common libraries:
+  - System libraries (os, sys, platform, subprocess)
+  - Data analysis (numpy, pandas)
+  - Visualization (matplotlib)
+  - Mathematical operations (math)
+- Capture and display print statements
+- Show execution results and variable values
+- Display matplotlib visualizations inline
 
 ### Developer Features
 - Tool preferences panel to enable/disable specific tools
@@ -199,23 +194,14 @@ Then navigate to http://localhost:8000 in your browser.
   - Usage: Ask questions like "Calculate 2^10 * 5" or "Solve the equation x^2 + 2x + 1"
   - Supports basic arithmetic, advanced math functions, NumPy, and SymPy
 
-### Computer Use Tools
+### Python Execution
 
-- **Python Execution**: Run Python code directly from the chat
-  - Usage: Say "Execute Python code to list all files in a directory" or "Run Python to create a simple plot"
-  - Executes Python code in a controlled environment
-
-- **System Information**: Get details about your operating system and hardware
-  - Usage: Ask "What's my system information?" or "Tell me about my computer"
-  - Returns platform, OS, Python version, and other system details
-
-- **File Explorer**: List files and directories in any path
-  - Usage: Say "List files in my downloads folder" or "Show me what's in the current directory"
-  - Returns a formatted list of files and directories
-
-- **File Reader**: Read the contents of files
-  - Usage: Ask "Read the contents of config.py" or "Show me what's in README.md"
-  - Returns the text content of the specified file
+- **Python Code Execution**: Run Python code directly from the chat
+  - Usage: Say "Execute Python code to calculate fibonacci numbers" or "Run Python to create a simple plot"
+  - Executes Python code in a controlled environment with access to common libraries
+  - Example: "Create a scatter plot of random data using matplotlib"
+  - Example: "Write a function to calculate the factorial of a number"
+  - Example: "Analyze this CSV data using pandas"
 
 ## Testing
 
@@ -285,9 +271,9 @@ Always run tests after adding new features or making changes to ensure everythin
 
 ## Known Issues
 
-- There's a UI bug where toggling agent mode shows computer tools instead of general agent tools.
-- Weather information is simulated and not based on real-time data.
-- The LLM may occasionally produce unexpected responses or fail to use tools correctly.
+- The LLM may occasionally produce unexpected responses or fail to execute Python code correctly.
+- Some advanced Python libraries may not be available in the execution environment.
+- File writing operations are restricted for security reasons.
 
 ## Contributing
 
