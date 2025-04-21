@@ -92,8 +92,6 @@ A web-based intelligent assistant powered by a local LLM that can perform web se
 - Python 3.10+ (3.12 recommended)
 - Conda environment "mcp"
 - Local LLM running on http://127.0.0.1:1234 (e.g., LM Studio)
-  - Recommended model: **Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf**
-  - This model has been tested and performs well with all features
 - Modern web browser with JavaScript enabled
 - Internet connection for web search and weather tools
 
@@ -121,10 +119,6 @@ pip install flask flask-cors requests beautifulsoup4 wikipedia duckduckgo-search
 ```
 
 4. Start your local LLM server (e.g., LM Studio) on port 1234
-   - Download and install [LM Studio](https://lmstudio.ai/)
-   - Download the recommended model: **Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf**
-   - Load the model in LM Studio
-   - Start the local server on port 1234 (default setting)
 
 ## Running the Application
 
@@ -197,10 +191,9 @@ Then navigate to http://localhost:8000 in your browser.
   - Usage: Ask questions like "Tell me about quantum computing from Wikipedia" or "What does Wikipedia say about the Roman Empire?"
   - Returns article summaries with links to full articles
 
-- **Weather**: Get real-time weather and forecast for a location
+- **Weather**: Get current weather and forecast for a location
   - Usage: Ask questions like "What's the weather in London?" or "Get me the forecast for Tokyo"
-  - Returns current conditions and forecast by scraping OpenWeather
-  - No API key required - works with any location available on OpenWeather
+  - Returns current conditions and a 5-day forecast
 
 - **Calculator**: Evaluate mathematical expressions
   - Usage: Ask questions like "Calculate 2^10 * 5" or "Solve the equation x^2 + 2x + 1"
@@ -293,8 +286,8 @@ Always run tests after adding new features or making changes to ensure everythin
 ## Known Issues
 
 - There's a UI bug where toggling agent mode shows computer tools instead of general agent tools.
+- Weather information is simulated and not based on real-time data.
 - The LLM may occasionally produce unexpected responses or fail to use tools correctly.
-- Web scraping for weather data may break if OpenWeather changes their website structure.
 
 ## Contributing
 

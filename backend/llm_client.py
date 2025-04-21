@@ -7,8 +7,7 @@ from typing import Any, Dict, List
 
 import requests
 
-from config import (LMSTUDIO_HOST, LMSTUDIO_MODEL, MAX_MODEL_TOKENS, TEMPERATURE,
-                   TOP_P, FREQUENCY_PENALTY, PRESENCE_PENALTY)
+from config import LMSTUDIO_HOST, LMSTUDIO_MODEL, MAX_MODEL_TOKENS, TEMPERATURE
 from tools import TOOLS
 from computer_use import COMPUTER_TOOLS
 
@@ -21,29 +20,12 @@ def clean_llm_response(response: Dict[str, Any]) -> Dict[str, Any]:
     if "content" in response and response["content"]:
         # Remove any special tokens that might appear in the response
         content = response["content"]
-
         # Remove special tokens like <|im_start|>, <|im_end|>, etc.
         content = re.sub(r'<\|im_(start|end)\|>', '', content)
-        content = re.sub(r'<\|endoftext\|>', '', content)
-
-        # Remove repetitive patterns (common in Qwen models when they get stuck)
-        # This handles patterns like "get get get get" or similar repetitions
-        content = re.sub(r'(\b\w+\b)(\s+\1){3,}', r'\1', content)
-
         # Remove any repeated newlines (more than 2)
         content = re.sub(r'\n{3,}', '\n\n', content)
-
         # Trim whitespace
         content = content.strip()
-
-        # If content is mostly repetitive words, replace with an error message
-        words = content.split()
-        if len(words) > 20:  # Only check longer responses
-            unique_words = set(words)
-            # If there are very few unique words compared to total words, it's likely repetitive
-            if len(unique_words) < len(words) * 0.2:  # Less than 20% unique words
-                content = "I apologize, but I'm having trouble generating a coherent response. Please try asking your question again."
-
         response["content"] = content
 
     return response
@@ -102,10 +84,6 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
                     "stream": False,
                     "max_tokens": MAX_MODEL_TOKENS,
                     "temperature": current_temp,
-                    "top_p": TOP_P,
-                    "frequency_penalty": FREQUENCY_PENALTY,
-                    "presence_penalty": PRESENCE_PENALTY,
-                    "stop": ["<|im_end|>", "<|endoftext|>", "<|im_start|>"],
                 },
                 timeout=60,
             )
@@ -113,25 +91,13 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
             data = resp.json()
             response = data["choices"][0]["message"]  # type: ignore[index]
 
-            # Check if the response has problematic tokens or patterns
-            if "content" in response and response["content"]:
-                content = response["content"]
-                has_problematic_tokens = "<|im_" in content or "<|endoftext|>" in content
-
-                # Check for repetitive patterns
-                words = content.split()
-                unique_words = set(words)
-                is_repetitive = len(words) > 20 and len(unique_words) < len(words) * 0.2
-
-                # Check for specific repetitive patterns like "get get get get"
-                repetitive_pattern = re.search(r'(\b\w+\b)(\s+\1){5,}', content)
-
-                if has_problematic_tokens or is_repetitive or repetitive_pattern:
-                    print(f"Detected problematic response, retrying ({retries+1}/{max_retries+1})")
-                    retries += 1
-                    if retries > max_retries:
-                        break
-                    continue
+            # Check if the response has problematic tokens
+            if "content" in response and response["content"] and "<|im_" in response["content"]:
+                print(f"Detected problematic tokens in response, retrying ({retries+1}/{max_retries+1})")
+                retries += 1
+                if retries > max_retries:
+                    break
+                continue
 
             # Clean up the response
             return clean_llm_response(response)
