@@ -10,7 +10,7 @@ import pytest
 # Add the backend directory to the path so we can import the tools module
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'backend'))
 
-from tools import calculator, pretty_print_calculator_results
+from backend.tools import calculator, pretty_print_calculator_results
 
 
 @pytest.mark.unit

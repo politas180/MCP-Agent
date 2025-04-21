@@ -11,7 +11,7 @@ import pytest
 # Add the backend directory to the path so we can import the tools module
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'backend'))
 
-from tools import search, pretty_print_search_results
+from backend.tools import search, pretty_print_search_results
 
 
 @pytest.mark.unit
@@ -19,7 +19,7 @@ from tools import search, pretty_print_search_results
 class TestSearchTool(unittest.TestCase):
     """Test cases for the search tool."""
 
-    @patch('tools.DDGS')
+    @patch('backend.tools.search.DDGS')
     def test_search_success(self, mock_ddgs):
         """Test that the search tool correctly returns results."""
         # Set up the mock
@@ -62,7 +62,7 @@ class TestSearchTool(unittest.TestCase):
             max_results=2
         )
 
-    @patch('tools.DDGS')
+    @patch('backend.tools.search.DDGS')
     def test_search_empty_results(self, mock_ddgs):
         """Test that the search tool handles empty results correctly."""
         # Set up the mock
@@ -78,7 +78,7 @@ class TestSearchTool(unittest.TestCase):
         # Verify the results
         self.assertEqual(len(results), 0)
 
-    @patch('tools.DDGS')
+    @patch('backend.tools.search.DDGS')
     def test_search_missing_fields(self, mock_ddgs):
         """Test that the search tool handles results with missing fields."""
         # Set up the mock
