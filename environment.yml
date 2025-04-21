@@ -1,0 +1,23 @@
+name: mcp
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - flask
+  - flask-cors
+  - requests
+  - beautifulsoup4
+  - pytest
+  - pytest-cov
+  - pytest-mock
+  - numpy
+  - sympy
+  - pip:
+    - wikipedia
+    - duckduckgo-search
+    - selenium
+    - webdriver-manager
+    - coverage
+    - pytest-html

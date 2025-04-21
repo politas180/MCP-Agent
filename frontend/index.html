@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Agent</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" id="light-theme">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" id="dark-theme" disabled>
+    <script>
+        // Check for dark mode preference and switch highlight.js theme accordingly
+        function updateCodeTheme() {
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.getElementById('light-theme').disabled = isDarkMode;
+            document.getElementById('dark-theme').disabled = !isDarkMode;
+        }
+
+        // Initial check
+        updateCodeTheme();
+
+        // Listen for changes in color scheme preference
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateCodeTheme);
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <!-- Add languages you want to support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/shell.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/scss.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/csharp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/markdown.min.js"></script>
+    <!-- Add KaTeX for LaTeX support -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔮 MCP Agent</h1>
+            <div class="header-controls">
+                <div class="mode-toggle">
+                    <label for="mode-switch">Advanced Mode</label>
+                    <label class="switch">
+                        <input type="checkbox" id="mode-switch">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="computer-use-toggle">
+                    <button id="computer-use-button" title="Computer Use Mode">
+                        <i class="fas fa-desktop"></i> Computer Use
+                    </button>
+                </div>
+                <div class="tools-toggle">
+                    <button id="tools-button" title="Toggle Tools Panel">
+                        <i class="fas fa-tools"></i> Tools
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="message system">
+                        <div class="message-content">
+                            <p>Welcome to MCP Agent! How can I help you today?</p>
+                            <p><small>Note: This application uses a local LLM which may occasionally produce unexpected responses. If you receive strange output, try asking your question again or resetting the conversation.</small></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="debug-panel" id="debug-panel">
+                    <h3>Debug Information <button id="clear-debug">Clear</button></h3>
+                    <div id="debug-content"></div>
+                </div>
+
+                <div class="timing-panel" id="timing-panel">
+                    <h3>Timing Information</h3>
+                    <div id="timing-content"></div>
+                </div>
+
+                <div class="tools-panel" id="tools-panel">
+                    <h3>Available Tools</h3>
+                    <p class="tools-description">Toggle tools on/off to control which ones the AI can use.</p>
+                    <div id="tools-content" class="tools-content">
+                        <!-- Tool toggles will be added here dynamically -->
+                    </div>
+                </div>
+
+                <div class="chat-input">
+                    <textarea id="user-input" placeholder="Type your message here..." rows="2"></textarea>
+                    <button id="send-button" title="Send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="actions">
+                <button id="reset-button" title="Reset Conversation">
+                    <i class="fas fa-trash"></i> Reset
+                </button>
+            </div>
+            <div class="status" id="status">
+                Ready
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
