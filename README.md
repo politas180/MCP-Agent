@@ -92,6 +92,8 @@ A web-based intelligent assistant powered by a local LLM that can perform web se
 - Python 3.10+ (3.12 recommended)
 - Conda environment "mcp"
 - Local LLM running on http://127.0.0.1:1234 (e.g., LM Studio)
+  - Recommended model: **Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf**
+  - This model has been tested and performs well with all features
 - Modern web browser with JavaScript enabled
 - Internet connection for web search and weather tools
 
@@ -119,6 +121,10 @@ pip install flask flask-cors requests beautifulsoup4 wikipedia duckduckgo-search
 ```
 
 4. Start your local LLM server (e.g., LM Studio) on port 1234
+   - Download and install [LM Studio](https://lmstudio.ai/)
+   - Download the recommended model: **Qwen2.5-7B-Instruct-1M-GGUF/Qwen2.5-7B-Instruct-1M-Q4_K_M.gguf**
+   - Load the model in LM Studio
+   - Start the local server on port 1234 (default setting)
 
 ## Running the Application
 
