@@ -47,6 +47,48 @@ header {
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Context usage display */
+.context-usage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 20px;
+    min-width: 200px;
+}
+
+.context-usage-text {
+    font-size: 12px;
+    color: var(--light-text);
+    margin-bottom: 4px;
+}
+
+.context-usage-bar {
+    width: 100%;
+    height: 6px;
+    background-color: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.context-usage-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* Change color based on usage */
+.context-usage-fill.warning {
+    background-color: var(--warning-color);
+}
+
+.context-usage-fill.danger {
+    background-color: var(--error-color);
 }
 
 .header-controls {

@@ -20,6 +20,8 @@ const toolsButton = document.getElementById('tools-button');
 const toolsPanel = document.getElementById('tools-panel');
 const toolsContent = document.getElementById('tools-content');
 const computerUseButton = document.getElementById('computer-use-button');
+const contextUsageText = document.querySelector('.context-usage-text');
+const contextUsageFill = document.querySelector('.context-usage-fill');
 
 // State
 let isAdvancedMode = false;
@@ -182,6 +184,11 @@ function processResponse(data) {
     // Display debug information in advanced mode
     if (isAdvancedMode && data.debug_info) {
         displayDebugInfo(data.debug_info);
+    }
+
+    // Update context window usage display
+    if (data.context_usage) {
+        updateContextUsageDisplay(data.context_usage);
     }
 
     // Set status message
@@ -535,6 +542,26 @@ function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// Update context window usage display
+function updateContextUsageDisplay(contextUsage) {
+    const { estimated_tokens, max_tokens } = contextUsage;
+    const usagePercentage = Math.min(100, Math.round((estimated_tokens / max_tokens) * 100));
+
+    // Update text
+    contextUsageText.textContent = `Context: ${estimated_tokens.toLocaleString()}/${max_tokens.toLocaleString()} tokens (${usagePercentage}%)`;
+
+    // Update progress bar
+    contextUsageFill.style.width = `${usagePercentage}%`;
+
+    // Update color based on usage
+    contextUsageFill.classList.remove('warning', 'danger');
+    if (usagePercentage >= 90) {
+        contextUsageFill.classList.add('danger');
+    } else if (usagePercentage >= 70) {
+        contextUsageFill.classList.add('warning');
+    }
+}
+
 // Toggle tools panel visibility
 function toggleToolsPanel() {
     isToolsPanelVisible = !isToolsPanelVisible;
@@ -734,7 +761,8 @@ function getToolDisplayName(toolName) {
         'calculator': 'Calculator',
 
         // Computer Use tools
-        'execute_python': 'Python Execution'
+        'execute_python': 'Python Execution',
+        'execute_terminal': 'Terminal Command'
     };
 
     return displayNames[toolName] || toolName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -750,7 +778,8 @@ function getToolDescription(toolName) {
         'calculator': 'Evaluate mathematical expressions',
 
         // Computer Use tools
-        'execute_python': 'Execute Python code without restrictions'
+        'execute_python': 'Execute Python code without restrictions',
+        'execute_terminal': 'Execute terminal commands without restrictions'
     };
 
     return descriptions[toolName] || 'Tool for ' + toolName.replace(/_/g, ' ');

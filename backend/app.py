@@ -16,6 +16,7 @@ from flask_cors import CORS
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from llm_client import llm_call
+from config import MAX_MODEL_TOKENS
 from tools import (TOOL_IMPLS, TOOLS, pretty_print_search_results,
                   pretty_print_wiki_results, pretty_print_weather_results,
                   pretty_print_calculator_results)
@@ -301,6 +302,15 @@ def chat():
         # Calculate total conversation time
         conversation_elapsed = time.time() - conversation_start_time
         response_data["timing"]["total"] = conversation_elapsed
+
+        # Calculate and add context window usage
+        # Estimate token count based on a simple heuristic (4 chars per token on average)
+        total_chars = sum(len(msg.get("content", "") or "") for msg in messages)
+        estimated_tokens = total_chars // 4
+        response_data["context_usage"] = {
+            "estimated_tokens": estimated_tokens,
+            "max_tokens": MAX_MODEL_TOKENS
+        }
 
         # Clean up the final message content before adding to the response
         assistant_content = assistant_msg.get("content", "")
