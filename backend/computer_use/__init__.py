@@ -7,12 +7,16 @@ from .tools import (
     COMPUTER_TOOLS,
     COMPUTER_TOOL_IMPLS,
     execute_python,
-    pretty_print_execute_python_results
+    execute_terminal_command,
+    pretty_print_execute_python_results,
+    pretty_print_execute_terminal_results
 )
 
 __all__ = [
     "COMPUTER_TOOLS",
     "COMPUTER_TOOL_IMPLS",
     "execute_python",
-    "pretty_print_execute_python_results"
+    "execute_terminal_command",
+    "pretty_print_execute_python_results",
+    "pretty_print_execute_terminal_results"
 ]

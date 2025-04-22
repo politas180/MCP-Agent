@@ -20,9 +20,10 @@ from tools import (TOOL_IMPLS, TOOLS, pretty_print_search_results,
                   pretty_print_wiki_results, pretty_print_weather_results,
                   pretty_print_calculator_results)
 
-# Import Python execution tool
+# Import Computer Use tools
 from computer_use import (COMPUTER_TOOLS, COMPUTER_TOOL_IMPLS,
-                        pretty_print_execute_python_results)
+                        pretty_print_execute_python_results,
+                        pretty_print_execute_terminal_results)
 
 app = Flask(__name__)
 app.secret_key = "mcp-agent-secret-key"  # For session management
@@ -231,9 +232,11 @@ def chat():
                             tool_result_text = pretty_print_weather_results(result)
                         elif name == "calculator":
                             tool_result_text = pretty_print_calculator_results(result)
-                        # Python execution tool
+                        # Computer Use tools
                         elif name == "execute_python":
                             tool_result_text = pretty_print_execute_python_results(result)
+                        elif name == "execute_terminal":
+                            tool_result_text = pretty_print_execute_terminal_results(result)
                         else:
                             tool_result_text = json.dumps(result)
 
