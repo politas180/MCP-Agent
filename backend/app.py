@@ -302,6 +302,84 @@ def chat():
             # Tool results are now in `messages`; let the LLM think again
             continue
 
+        # Check if the assistant is trying to show a code block after a tool error
+        # This is a common pattern when the agent tries to fix a failed code execution
+        assistant_content = assistant_msg.get("content", "")
+        last_tool_error = False
+        python_code_block = None
+
+        # Check if the last message was a tool error
+        if len(messages) >= 2 and messages[-1].get("role") == "tool" and "Error" in messages[-1].get("content", ""):
+            last_tool_error = True
+            # Check if the assistant's response contains a Python code block
+            if assistant_content and "```python" in assistant_content:
+                # Extract the Python code from the code block
+                code_blocks = re.findall(r'```python\n(.+?)\n```', assistant_content, re.DOTALL)
+                if not code_blocks:
+                    # Try alternative format
+                    code_blocks = re.findall(r'```py\n(.+?)\n```', assistant_content, re.DOTALL)
+
+                if code_blocks:
+                    python_code_block = code_blocks[0].strip()
+
+        # If we found a Python code block after an error, execute it automatically
+        if last_tool_error and python_code_block and session_id in COMPUTER_USE_SESSIONS:
+            # Debug info for advanced mode
+            if advanced_mode:
+                response_data["debug_info"].append({
+                    "type": "auto_retry",
+                    "content": f"Automatically executing fixed code:\n{python_code_block}"
+                })
+
+            # Execute the corrected code
+            tool_start_time = time.time()
+            try:
+                # Get the Python execution tool implementation
+                python_exec_impl = COMPUTER_TOOL_IMPLS.get("execute_python")
+                if python_exec_impl:
+                    result = python_exec_impl(code=python_code_block)
+                    tool_result_text = pretty_print_execute_python_results(result)
+
+                    # Sanitize the result
+                    tool_result_text = sanitize_tool_result(tool_result_text)
+
+                    # Add the tool call and result to the messages
+                    tool_call_id = f"auto_retry_{int(time.time())}"
+                    tool_call = {
+                        "id": tool_call_id,
+                        "function": {
+                            "name": "execute_python",
+                            "arguments": json.dumps({"code": python_code_block})
+                        }
+                    }
+
+                    # Add the auto-retry tool call and result to messages
+                    messages.append({"role": "assistant", "content": None, "tool_calls": [tool_call]})
+                    messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": tool_result_text})
+
+                    # Make another LLM call to interpret the results
+                    llm_start_time = time.time()
+                    assistant_msg = llm_call(messages, computer_use_mode=(session_id in COMPUTER_USE_SESSIONS))
+                    llm_elapsed = time.time() - llm_start_time
+
+                    # Record LLM timing
+                    response_data["timing"]["llm_calls"].append(llm_elapsed)
+
+                    # Debug info for advanced mode
+                    if advanced_mode:
+                        response_data["debug_info"].append({
+                            "type": "auto_retry_result",
+                            "content": tool_result_text,
+                            "timing": time.time() - tool_start_time
+                        })
+            except Exception as e:
+                # If auto-retry fails, just continue with the original response
+                if advanced_mode:
+                    response_data["debug_info"].append({
+                        "type": "auto_retry_error",
+                        "content": f"Error during auto-retry: {str(e)}"
+                    })
+
         # Final assistant answer
         messages.append(assistant_msg)
 
