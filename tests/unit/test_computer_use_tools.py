@@ -14,6 +14,7 @@ from backend.computer_use.tools import (
     execute_python,
     pretty_print_execute_python_results
 )
+from backend.computer_use.tools.utils import sanitize_python_code
 
 
 @pytest.mark.unit
@@ -119,6 +120,59 @@ result = "Plot created"
         output = pretty_print_execute_python_results(result)
         self.assertIn("Plot created", output)
         self.assertIn("<img src=\"data:image/png;base64,base64encodeddata\" />", output)
+
+    def test_sanitize_python_code_markdown_block(self):
+        """Test sanitizing Python code with markdown code block formatting."""
+        code = """```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(-2 * np.pi, 2 * np.pi, 1000)
+s = np.sin(t)
+
+plt.figure(figsize=(8, 5))
+plt.plot(t, s, label='sin(t)', color='blue')
+plt.title('Sine Wave from -2π to 2π')
+plt.xlabel('t (radians)')
+plt.ylabel('sin(t)')
+plt.legend()
+
+image_path = 'sine_wave.png'
+plt.savefig(image_path, dpi=300)
+plt.close()
+```"""
+        sanitized = sanitize_python_code(code)
+        self.assertNotIn("```python", sanitized)
+        self.assertNotIn("```", sanitized)
+        self.assertIn("import numpy as np", sanitized)
+        self.assertIn("plt.savefig(image_path, dpi=300)", sanitized)
+
+    def test_sanitize_python_code_with_extra_text(self):
+        """Test sanitizing Python code with extra text like 'python', 'Copy', 'Edit'."""
+        code = """python
+Copy
+Edit
+```py
+print('Hello, world!')
+result = 42
+```"""
+        sanitized = sanitize_python_code(code)
+        self.assertNotIn("python", sanitized)
+        self.assertNotIn("Copy", sanitized)
+        self.assertNotIn("Edit", sanitized)
+        self.assertNotIn("```py", sanitized)
+        self.assertNotIn("```", sanitized)
+        self.assertIn("print('Hello, world!')", sanitized)
+        self.assertIn("result = 42", sanitized)
+
+    def test_execute_python_with_markdown_formatting(self):
+        """Test executing Python code with markdown formatting."""
+        code = """```python
+result = 2 + 2
+```"""
+        result = execute_python(code)
+        self.assertEqual(result["status"], "success")
+        self.assertTrue("4" in result["output"] or result["variables"]["result"] == "4")
 
 
 if __name__ == '__main__':

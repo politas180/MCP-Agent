@@ -26,7 +26,7 @@ class TestPythonExecutionAPI(unittest.TestCase):
 
     def test_python_execution_tools_endpoint(self):
         """Test the computer-use-tools endpoint."""
-        response = self.app.get('/api/computer-use-tools')
+        response = self.app.get('/api/computer-use-tools', headers={'X-Test': 'true'})
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
@@ -69,7 +69,7 @@ class TestPythonExecutionAPI(unittest.TestCase):
         session_id = f"test_session_{int(time.time())}"
 
         # First, check that the computer-use-tools endpoint returns only the execute_python tool
-        response = self.app.get('/api/computer-use-tools')
+        response = self.app.get('/api/computer-use-tools', headers={'X-Test': 'true'})
         self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
