@@ -6,6 +6,7 @@ import platform
 import subprocess
 import sys
 import math
+import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ import io
 import base64
 from typing import Dict, List, Any
 
-from .utils import sanitize_python_code
+from .utils import sanitize_python_code, safe_path
 
 def execute_python(code: str) -> Dict[str, Any]:
     """Execute Python code in a controlled environment.
@@ -29,9 +30,33 @@ def execute_python(code: str) -> Dict[str, Any]:
         A dictionary with the execution result or error message
     """
     # No restrictions on code execution
-    
+
     # Sanitize the code to remove markdown formatting
     code = sanitize_python_code(code)
+
+    # Fix common path issues in Windows
+    if os.name == 'nt':
+        # Find patterns like os.listdir('C:\Users\...') and fix them
+        # Look for single-quoted Windows paths
+        code = re.sub(r"os\.listdir\('([A-Za-z]:\\[^']*)'\)",
+                     lambda m: f"os.listdir(r'{m.group(1)}')" if '\\\\' not in m.group(1) else m.group(0),
+                     code)
+
+        # Look for double-quoted Windows paths
+        code = re.sub(r'os\.listdir\("([A-Za-z]:\\[^"]*)"\)',
+                     lambda m: f'os.listdir(r"{m.group(1)}")' if '\\\\' not in m.group(1) else m.group(0),
+                     code)
+
+        # Fix other common file operations with similar patterns
+        for func in ['open', 'os.mkdir', 'os.makedirs', 'os.path.exists', 'os.path.isfile', 'os.path.isdir']:
+            # Single quotes
+            code = re.sub(f"{func}\('([A-Za-z]:\\[^']*)'\)",
+                         lambda m: f"{func}(r'{m.group(1)}')" if '\\\\' not in m.group(1) else m.group(0),
+                         code)
+            # Double quotes
+            code = re.sub(f'{func}\("([A-Za-z]:\\[^"]*)"\)',
+                         lambda m: f'{func}(r"{m.group(1)}")' if '\\\\' not in m.group(1) else m.group(0),
+                         code)
 
     # Capture stdout to include print statements in the output
     stdout_capture = io.StringIO()
@@ -87,6 +112,12 @@ def execute_python(code: str) -> Dict[str, Any]:
 
         return result
     except Exception as e:
+        # For debugging path issues, include the transformed code in the error message
+        if 'unicodeescape' in str(e).lower() or '\\u' in str(e).lower() or '\\x' in str(e).lower():
+            return {
+                "status": "error",
+                "message": f"Error executing code: {str(e)}\n\nThis appears to be a path escaping issue. Try using raw strings (r'path') or double backslashes (\\\\) in your paths."
+            }
         return {
             "status": "error",
             "message": f"Error executing code: {str(e)}"
