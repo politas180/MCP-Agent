@@ -36,26 +36,4 @@ def pretty_print_execute_python_results(result: Dict[str, Any]) -> str:
 
     return formatted
 
-def pretty_print_execute_terminal_results(result: Dict[str, Any]) -> str:
-    """Format execute_terminal results for display."""
-    if result.get("status") == "error" and result.get("message"):
-        return f"Error: {result.get('message', 'Unknown error')}"
 
-    output = result.get("output", "")
-    error_output = result.get("error_output")
-    return_code = result.get("return_code")
-
-    formatted = ""
-
-    # Add command output
-    if output:
-        formatted += f"Command Output:\n{output}\n\n"
-
-    # Add error output if any
-    if error_output:
-        formatted += f"Error Output:\n{error_output}\n\n"
-
-    # Add return code
-    formatted += f"Return Code: {return_code}\n"
-
-    return formatted

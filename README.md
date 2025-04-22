@@ -49,7 +49,6 @@ A web-based Python code execution tool powered by a local LLM. This tool allows 
 │       ├── tools/            # Computer control tools directory
 │       │   ├── __init__.py   # Tools initialization
 │       │   ├── python_execution.py # Python execution tool
-│       │   ├── terminal_execution.py # Terminal execution tool
 │       │   ├── schemas.py    # Tool schemas
 │       │   ├── utils.py      # Utility functions
 │       │   └── formatting.py # Output formatting
@@ -173,8 +172,8 @@ Then navigate to http://localhost:8000 in your browser.
 
 2. **Computer Use Mode**:
    - Click the "Computer Use" button in the header to toggle Computer Use mode
-   - In this mode, the agent can execute Python code and interact with your file system
-   - Use with caution as this mode has access to your computer
+   - In this mode, the agent can execute Python code to interact with your file system and perform system operations
+   - Use with caution as this mode has unrestricted access to your computer through Python
 
 ### Tool Management
 
@@ -210,13 +209,9 @@ Then navigate to http://localhost:8000 in your browser.
   - Example: "Create a scatter plot of random data using matplotlib"
   - Example: "Write a function to calculate the factorial of a number"
   - Example: "Analyze this CSV data using pandas"
-
-- **Terminal Command Execution**: Run terminal commands directly from the chat
-  - Usage: Say "List all files in the current directory" or "Check system information"
-  - Executes terminal commands without restrictions
-  - Example: "Show me the running processes"
-  - Example: "Create a new directory called 'test'"
-  - Example: "Check the IP configuration of this machine"
+  - Example: "List files in the current directory using os.listdir()"
+  - Example: "Get system information using the platform module"
+  - Example: "Create a new directory using os.mkdir()"
 
 ## Testing
 
@@ -290,8 +285,8 @@ Always run tests after adding new features or making changes to ensure everythin
 ## Known Issues
 
 - **UI Issues**:
-  - Toggling agent mode shows computer tools instead of general agent tools
   - Users cannot see and choose available tools in both computer use and general agent tools
+  - Context window usage indicator needed in the top right of the frontend
 
 - **LLM Issues**:
   - The LLM model (Qwen2.5-7B-Instruct-1M) may occasionally generate repetitive nonsensical output

@@ -23,8 +23,7 @@ from tools import (TOOL_IMPLS, TOOLS, pretty_print_search_results,
 
 # Import Computer Use tools
 from computer_use import (COMPUTER_TOOLS, COMPUTER_TOOL_IMPLS,
-                        pretty_print_execute_python_results,
-                        pretty_print_execute_terminal_results)
+                        pretty_print_execute_python_results)
 
 # Import system information
 from system_info import get_system_info
@@ -72,20 +71,19 @@ def get_system_prompt() -> str:
         "You are a computer control assistant with unrestricted capabilities. \n\n" +
         date_info +
         system_info + "\n\n" +
-        "You have access to two powerful tools:\n" +
-        "1. execute_terminal: Run any terminal command without restrictions. This tool executes commands directly in the command prompt/terminal.\n" +
-        "2. execute_python: Run any Python code without restrictions.\n\n" +
-        "IMPORTANT INSTRUCTIONS FOR TOOL SELECTION:\n" +
-        "- For ANY command that can be run in a terminal/command prompt, you MUST use the execute_terminal tool.\n" +
-        "- Examples of when to use execute_terminal: dir, ls, cd, mkdir, rm, del, copy, move, ping, ipconfig, systeminfo, etc.\n" +
-        "- Only use execute_python when you need to write actual Python code with functions, loops, etc.\n\n" +
+        "You have access to one powerful tool:\n" +
+        "execute_python: Run any Python code without restrictions.\n\n" +
+        "This tool allows you to execute Python code with full access to the file system, network, and all available resources.\n\n" +
+        "You can use this tool to perform any operation on the user's computer, including:\n" +
+        "- File operations (reading, writing, deleting files)\n" +
+        "- System operations (getting system information, running processes)\n" +
+        "- Network operations (making HTTP requests, connecting to servers)\n" +
+        "- And any other operation that can be performed with Python\n\n" +
         "Examples:\n" +
-        "- If user asks to list files: Use execute_terminal with command 'dir' or 'ls'\n" +
-        "- If user asks to create a directory: Use execute_terminal with command 'mkdir directory_name'\n" +
-        "- If user asks to check system info: Use execute_terminal with command 'systeminfo'\n" +
-        "- If user asks to write a Python script: Use execute_python\n\n" +
-        "Both tools run without restrictions, allowing full access to the file system, network, and all available resources.\n\n" +
-        "REMEMBER: For simple commands, ALWAYS use execute_terminal, not execute_python."
+        "- If user asks to list files: Use execute_python with code that uses os.listdir() or glob\n" +
+        "- If user asks to create a directory: Use execute_python with code that uses os.mkdir()\n" +
+        "- If user asks to check system info: Use execute_python with code that uses platform or psutil modules\n" +
+        "- If user asks to write a Python script: Use execute_python with the script code"
     )
 
     # The actual prompt will be selected in the get_or_create_conversation function based on mode
@@ -273,8 +271,7 @@ def chat():
                         # Computer Use tools
                         elif name == "execute_python":
                             tool_result_text = pretty_print_execute_python_results(result)
-                        elif name == "execute_terminal":
-                            tool_result_text = pretty_print_execute_terminal_results(result)
+
                         else:
                             tool_result_text = json.dumps(result)
 
