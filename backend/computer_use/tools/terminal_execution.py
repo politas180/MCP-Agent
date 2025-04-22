@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import platform
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 def execute_terminal_command(command: str) -> Dict[str, Any]:
     """Execute a terminal command without restrictions.
@@ -23,8 +22,9 @@ def execute_terminal_command(command: str) -> Dict[str, Any]:
         # Determine the shell to use based on the platform
         use_shell = True
         if platform.system() == "Windows":
-            # On Windows, we'll use cmd.exe
-            shell_cmd = command
+            # On Windows, we'll use cmd.exe with /c flag to execute the command
+            # This ensures proper command execution in Windows environment
+            shell_cmd = f"cmd.exe /c {command}"
         else:
             # On Unix-like systems, we'll use bash
             shell_cmd = command
@@ -35,7 +35,8 @@ def execute_terminal_command(command: str) -> Dict[str, Any]:
             shell=use_shell,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            cwd=os.getcwd()  # Explicitly set the current working directory
         )
 
         # Get the output

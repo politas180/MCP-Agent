@@ -63,12 +63,19 @@ def get_system_prompt() -> str:
     computer_use_prompt = (
         "You are a computer control assistant with unrestricted capabilities. " + date_info +
         "You have access to two powerful tools:\n" +
-        "1. execute_python: Run any Python code without restrictions. You can use this tool to execute Python code for data analysis, visualization, automation tasks, and more.\n" +
-        "2. execute_terminal: Run any terminal command without restrictions. You can use this tool to execute commands in the system's command prompt or terminal for file operations, system management, and more.\n\n" +
-        "Both tools run without restrictions, allowing full access to the file system, network, and all available resources. " +
-        "When a user asks you to perform a task that involves terminal commands (like listing files, running system commands, etc.), " +
-        "you should use the execute_terminal tool. For tasks that require Python programming, use the execute_python tool.\n\n" +
-        "Always choose the most appropriate tool for the task at hand."
+        "1. execute_terminal: Run any terminal command without restrictions. This tool executes commands directly in the command prompt/terminal.\n" +
+        "2. execute_python: Run any Python code without restrictions.\n\n" +
+        "IMPORTANT INSTRUCTIONS FOR TOOL SELECTION:\n" +
+        "- For ANY command that can be run in a terminal/command prompt, you MUST use the execute_terminal tool.\n" +
+        "- Examples of when to use execute_terminal: dir, ls, cd, mkdir, rm, del, copy, move, ping, ipconfig, systeminfo, etc.\n" +
+        "- Only use execute_python when you need to write actual Python code with functions, loops, etc.\n\n" +
+        "Examples:\n" +
+        "- If user asks to list files: Use execute_terminal with command 'dir' or 'ls'\n" +
+        "- If user asks to create a directory: Use execute_terminal with command 'mkdir directory_name'\n" +
+        "- If user asks to check system info: Use execute_terminal with command 'systeminfo'\n" +
+        "- If user asks to write a Python script: Use execute_python\n\n" +
+        "Both tools run without restrictions, allowing full access to the file system, network, and all available resources.\n\n" +
+        "REMEMBER: For simple commands, ALWAYS use execute_terminal, not execute_python."
     )
 
     # The actual prompt will be selected in the get_or_create_conversation function based on mode
@@ -143,11 +150,28 @@ def chat():
 
     # Process the conversation
     while True:
+        # Manage context window by keeping only essential messages
+        # Always keep the system message and the most recent user message
+        if len(messages) > 10:  # If conversation is getting long
+            # Keep system message, last 4 user-assistant exchanges, and current user message
+            # This preserves conversation flow while reducing context size
+            system_message = messages[0]  # System message is always first
+            recent_messages = messages[-9:]  # Last 4 exchanges (8 messages) + current user message
+            messages = [system_message] + recent_messages
+
+            # Remove tool call details to save context space
+            for i, msg in enumerate(messages):
+                # Keep tool call results but simplify them
+                if msg.get("role") == "tool":
+                    # Truncate long tool results
+                    if "content" in msg and len(msg["content"]) > 500:
+                        msg["content"] = msg["content"][:500] + "\n[Content truncated to save context space]\n"
+
         # Debug info for advanced mode
         if advanced_mode:
             response_data["debug_info"].append({
                 "type": "llm_input",
-                "content": messages[-5:] if len(messages) > 5 else messages
+                "content": messages
             })
 
         # Time the LLM call
