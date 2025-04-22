@@ -9,6 +9,8 @@ A web-based Python code execution tool powered by a local LLM. This tool allows 
 - Responsive design that works on desktop and mobile devices
 - Dark/light mode support based on system preferences
 - Session persistence (conversations are saved between page reloads)
+- Context window usage indicator showing token usage
+- Automatic system information gathering for Computer Use mode
 
 ### Operation Modes
 - **Normal Mode**: Streamlined interface for everyday use
@@ -40,10 +42,17 @@ A web-based Python code execution tool powered by a local LLM. This tool allows 
 │   ├── app.py                # Flask application
 │   ├── config.py             # Configuration
 │   ├── llm_client.py         # LLM communication
-│   ├── tools.py              # Standard tool implementations
+│   ├── system_info.py        # System information gathering
+│   ├── tools/                # Standard tools directory
 │   └── computer_use/         # Computer Use mode tools
 │       ├── __init__.py       # Package initialization
-│       ├── tools.py          # Computer control tools
+│       ├── tools/            # Computer control tools directory
+│       │   ├── __init__.py   # Tools initialization
+│       │   ├── python_execution.py # Python execution tool
+│       │   ├── terminal_execution.py # Terminal execution tool
+│       │   ├── schemas.py    # Tool schemas
+│       │   ├── utils.py      # Utility functions
+│       │   └── formatting.py # Output formatting
 │       └── README.md         # Documentation for Computer Use mode
 ├── frontend/
 │   ├── index.html            # Main HTML page
@@ -193,14 +202,21 @@ Then navigate to http://localhost:8000 in your browser.
   - Usage: Ask questions like "Calculate 2^10 * 5" or "Solve the equation x^2 + 2x + 1"
   - Supports basic arithmetic, advanced math functions, NumPy, and SymPy
 
-### Python Execution
+### Computer Use Tools
 
 - **Python Code Execution**: Run Python code directly from the chat
   - Usage: Say "Execute Python code to calculate fibonacci numbers" or "Run Python to create a simple plot"
-  - Executes Python code in a controlled environment with access to common libraries
+  - Executes Python code without restrictions with access to all libraries
   - Example: "Create a scatter plot of random data using matplotlib"
   - Example: "Write a function to calculate the factorial of a number"
   - Example: "Analyze this CSV data using pandas"
+
+- **Terminal Command Execution**: Run terminal commands directly from the chat
+  - Usage: Say "List all files in the current directory" or "Check system information"
+  - Executes terminal commands without restrictions
+  - Example: "Show me the running processes"
+  - Example: "Create a new directory called 'test'"
+  - Example: "Check the IP configuration of this machine"
 
 ## Testing
 
@@ -251,6 +267,7 @@ The tests include coverage reporting to ensure all code is properly tested. When
   - `tests/unit/test_weather_tool.py`: Tests for the weather tool
   - `tests/unit/test_search_tool.py`: Tests for the search tool
   - `tests/unit/test_wiki_tool.py`: Tests for the Wikipedia tool
+  - `tests/unit/test_system_info.py`: Tests for the system information module
   - `tests/unit/test_backend_app.py`: Tests for the Flask application
   - `tests/unit/test_llm_client.py`: Tests for the LLM client
   - `tests/unit/test_frontend_js.py`: Tests for the frontend JavaScript
@@ -258,6 +275,8 @@ The tests include coverage reporting to ensure all code is properly tested. When
 - **Integration Tests**: Test components working together
   - `tests/integration/test_backend_api.py`: Tests for the backend API
   - `tests/integration/test_frontend_rendering.py`: Tests for the frontend rendering
+  - `tests/integration/test_system_info_integration.py`: Tests for system information integration
+  - `tests/integration/test_computer_use_api.py`: Tests for the Computer Use API
 
 Always run tests after adding new features or making changes to ensure everything works correctly.
 
@@ -270,9 +289,17 @@ Always run tests after adding new features or making changes to ensure everythin
 
 ## Known Issues
 
-- The LLM may occasionally produce unexpected responses or fail to execute Python code correctly.
-- With unrestricted execution, be careful when running code that modifies your system.
-- Always review code before execution, especially when it involves system modifications or file operations.
+- **UI Issues**:
+  - Toggling agent mode shows computer tools instead of general agent tools
+  - Users cannot see and choose available tools in both computer use and general agent tools
+
+- **LLM Issues**:
+  - The LLM model (Qwen2.5-7B-Instruct-1M) may occasionally generate repetitive nonsensical output
+  - The LLM may fail to execute Python code correctly in some cases
+
+- **Security Considerations**:
+  - With unrestricted execution, be careful when running code that modifies your system
+  - Always review code before execution, especially when it involves system modifications or file operations
 
 ## Contributing
 

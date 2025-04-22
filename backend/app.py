@@ -26,6 +26,9 @@ from computer_use import (COMPUTER_TOOLS, COMPUTER_TOOL_IMPLS,
                         pretty_print_execute_python_results,
                         pretty_print_execute_terminal_results)
 
+# Import system information
+from system_info import get_system_info
+
 app = Flask(__name__)
 app.secret_key = "mcp-agent-secret-key"  # For session management
 CORS(app)  # Enable CORS for all routes
@@ -40,7 +43,7 @@ TOOL_PREFERENCES = {}
 COMPUTER_USE_SESSIONS = set()
 
 def get_system_prompt() -> str:
-    """Generate system prompt with current date and time information."""
+    """Generate system prompt with current date and time information and system info."""
     now = datetime.now()
     date_info = (
         f"Current date and time information:\n"
@@ -53,16 +56,22 @@ def get_system_prompt() -> str:
         f"- Current timestamp: {now.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
     )
 
+    # Get system information
+    system_info = get_system_info()
+
     # Different prompts based on mode
     standard_prompt = (
-        "You are an intelligent assistant. " + date_info +
+        "You are an intelligent assistant. \n\n" +
+        date_info +
         "If you need to perform a web search, Wikipedia search, get weather information, or perform calculations, "
         "call the appropriate tool. The calculator tool can evaluate mathematical expressions using math, numpy, and sympy libraries. "
         "Use as many tool calls as needed until you have the information required to answer the user conclusively."
     )
 
     computer_use_prompt = (
-        "You are a computer control assistant with unrestricted capabilities. " + date_info +
+        "You are a computer control assistant with unrestricted capabilities. \n\n" +
+        date_info +
+        system_info + "\n\n" +
         "You have access to two powerful tools:\n" +
         "1. execute_terminal: Run any terminal command without restrictions. This tool executes commands directly in the command prompt/terminal.\n" +
         "2. execute_python: Run any Python code without restrictions.\n\n" +
