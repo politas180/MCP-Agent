@@ -615,24 +615,18 @@ async function loadToolPreferences() {
         }
 
         const data = await response.json();
-        if (data.status === 'success') {
-            if (isComputerUseMode && data.tools) {
-                // For Computer Use mode, we get a list of tools with names and descriptions
-                // Convert to the format expected by renderToolsPanel
-                toolPreferences = {};
-                data.tools.forEach(tool => {
-                    toolPreferences[tool.name] = true; // Enable all by default
-                });
-            } else if (data.tools) {
-                // For regular mode, we get the existing preferences
-                toolPreferences = data.tools;
-            }
+        if (data.status === 'success' && data.tools) {
+            // Both endpoints now return the same format: {"status": "success", "tools": {"tool_name": true}}
+            toolPreferences = data.tools;
 
             // Save to localStorage
             localStorage.setItem(TOOL_PREFERENCES_KEY, JSON.stringify(toolPreferences));
 
             // Render the tools panel
             renderToolsPanel(toolPreferences);
+        } else {
+            console.error('Invalid response format from tools endpoint');
+            setStatusMessage('Error loading tools', 'error');
         }
     } catch (error) {
         console.error('Error loading tool preferences:', error);
@@ -740,13 +734,10 @@ function getToolDisplayName(toolName) {
         'calculator': 'Calculator',
 
         // Computer Use tools
-        'execute_python': 'Python Execution',
-        'get_system_info': 'System Info',
-        'list_files': 'File Explorer',
-        'read_file': 'File Reader'
+        'execute_python': 'Python Execution'
     };
 
-    return displayNames[toolName] || toolName;
+    return displayNames[toolName] || toolName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 // Get a description for a tool
@@ -759,11 +750,8 @@ function getToolDescription(toolName) {
         'calculator': 'Evaluate mathematical expressions',
 
         // Computer Use tools
-        'execute_python': 'Execute Python code for computer control tasks',
-        'get_system_info': 'Get information about your system',
-        'list_files': 'List files and directories in a specified path',
-        'read_file': 'Read the contents of a file'
+        'execute_python': 'Execute Python code without restrictions'
     };
 
-    return descriptions[toolName] || 'No description available';
+    return descriptions[toolName] || 'Tool for ' + toolName.replace(/_/g, ' ');
 }

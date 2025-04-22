@@ -347,19 +347,16 @@ def manage_tools():
 @app.route('/api/computer-use-tools', methods=['GET'])
 def computer_use_tools():
     """Get the Python execution tool."""
-    # Return the Python execution tool
-    tools_info = []
+    # Return the computer use tools in the same format as regular tools
+    # This ensures the frontend can handle both formats consistently
+    tool_prefs = {}
     for tool in COMPUTER_TOOLS:
         name = tool['function']['name']
-        description = tool['function']['description']
-        tools_info.append({
-            'name': name,
-            'description': description
-        })
+        tool_prefs[name] = True  # Enable all by default
 
     return jsonify({
         "status": "success",
-        "tools": tools_info
+        "tools": tool_prefs
     })
 
 @app.route('/api/health', methods=['GET'])
