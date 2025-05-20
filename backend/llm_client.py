@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import time
 from typing import Any, Dict, List
+import logging
 
 import requests
 
@@ -12,6 +13,8 @@ from tools import TOOLS
 from computer_use import COMPUTER_TOOLS
 
 __all__ = ["llm_call"]
+
+logger = logging.getLogger(__name__)
 
 
 def clean_llm_response(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -66,6 +69,8 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
     retries = 0
     last_error = None
 
+    logger.info(f"Attempting LLM call. Model: {LMSTUDIO_MODEL}, Host: {LMSTUDIO_HOST}, Messages: {len(cleaned_messages)}, Mode: {'ComputerUse' if computer_use_mode else 'Standard'}")
+
     while retries <= max_retries:
         try:
             # If this is a retry, slightly adjust the temperature to get a different response
@@ -93,18 +98,19 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
 
             # Check if the response has problematic tokens
             if "content" in response and response["content"] and "<|im_" in response["content"]:
-                print(f"Detected problematic tokens in response, retrying ({retries+1}/{max_retries+1})")
+                logger.warning(f"Detected problematic tokens in response, retrying ({retries+1}/{max_retries+1})")
                 retries += 1
                 if retries > max_retries:
                     break
                 continue
 
             # Clean up the response
+            logger.info("LLM call successful.")
             return clean_llm_response(response)
 
         except Exception as e:
             last_error = e
-            print(f"Error in LLM call (attempt {retries+1}/{max_retries+1}): {e}")
+            logger.warning(f"Error in LLM call (attempt {retries+1}/{max_retries+1}): {e}. Retrying...")
             retries += 1
             if retries <= max_retries:
                 # Wait a bit before retrying
@@ -113,7 +119,7 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
                 break
 
     # If we get here, all retries failed
-    print(f"All {max_retries+1} attempts failed. Last error: {last_error}")
+    logger.error(f"All {max_retries+1} LLM attempts failed. Last error: {last_error}")
     return {
         "role": "assistant",
         "content": "I'm sorry, I encountered an error processing your request. Please try again."

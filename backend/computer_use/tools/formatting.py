@@ -6,7 +6,9 @@ from typing import Dict, Any
 def pretty_print_execute_python_results(result: Dict[str, Any]) -> str:
     """Format execute_python results for display."""
     if result.get("status") == "error":
-        return f"Error: {result.get('message', 'Unknown error')}"
+        error_type = result.get('error_type', 'UnknownError')
+        message = result.get('message', 'No message')
+        return f"Python Execution Error: {error_type}\nMessage: {message}"
 
     output = result.get("output", "")
     variables = result.get("variables", {})

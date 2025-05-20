@@ -116,9 +116,11 @@ def execute_python(code: str) -> Dict[str, Any]:
         if 'unicodeescape' in str(e).lower() or '\\u' in str(e).lower() or '\\x' in str(e).lower():
             return {
                 "status": "error",
-                "message": f"Error executing code: {str(e)}\n\nThis appears to be a path escaping issue. Try using raw strings (r'path') or double backslashes (\\\\) in your paths."
+                "error_type": type(e).__name__,
+                "message": f"Error executing Python code: {str(e)}\n\nThis appears to be a path escaping issue. Try using raw strings (r'path') or double backslashes (\\\\) in your paths."
             }
         return {
             "status": "error",
-            "message": f"Error executing code: {str(e)}"
+            "error_type": type(e).__name__,
+            "message": f"Error executing Python code: {str(e)}"
         }

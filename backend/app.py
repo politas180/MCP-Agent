@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 from typing import Any, Dict, List
+import logging
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -32,6 +33,10 @@ app = Flask(__name__)
 app.secret_key = "mcp-agent-secret-key"  # For session management
 CORS(app)  # Enable CORS for all routes
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stderr)
+logger = logging.getLogger(__name__)
+
 # Session storage for conversations
 CONVERSATIONS = {}
 
@@ -40,6 +45,14 @@ TOOL_PREFERENCES = {}
 
 # Computer Use mode sessions
 COMPUTER_USE_SESSIONS = set()
+
+def estimate_tokens(text: str) -> int:
+    """Estimate token count for a given text.
+    Uses a simple heuristic: 1 token ~ 4 characters.
+    """
+    if not text:
+        return 0
+    return len(text) // 4
 
 def get_system_prompt() -> str:
     """Generate system prompt with current date and time information and system info."""
@@ -69,6 +82,7 @@ def get_system_prompt() -> str:
 
     computer_use_prompt = (
         "You are a computer control assistant with unrestricted capabilities. \n\n" +
+        "WARNING: This mode provides powerful capabilities to interact with your computer. Ensure you understand the commands being executed and the potential impact on your system. Do not run commands from untrusted sources.\n\n" +
         date_info +
         system_info + "\n\n" +
         "You have access to one powerful tool:\n" +
@@ -104,6 +118,13 @@ def get_or_create_conversation(session_id: str) -> List[Dict[str, Any]]:
         # Update the system prompt with current time and mode
         CONVERSATIONS[session_id][0] = {"role": "system", "content": prompt}
 
+    # Add warning message for computer use mode if it's the first message after system prompt
+    if is_computer_use and len(CONVERSATIONS[session_id]) == 1:
+        CONVERSATIONS[session_id].append({
+            "role": "assistant",
+            "content": "WARNING: Computer Use Mode is now active. This mode allows the execution of arbitrary code on your system and can have significant impacts. Only proceed if you understand the risks. Do not execute commands or code from untrusted sources."
+        })
+
     return CONVERSATIONS[session_id]
 
 @app.route('/api/chat', methods=['POST'])
@@ -114,6 +135,8 @@ def chat():
     session_id = data.get('session_id', 'default')
     advanced_mode = data.get('advanced_mode', False)
     computer_use_mode = data.get('computer_use_mode', False)
+
+    logger.info(f"Received chat request for session_id: {session_id}, advanced_mode: {advanced_mode}, computer_use_mode: {computer_use_mode}")
 
     # Update tool preferences if provided
     tool_preferences = data.get('tool_preferences', None)
@@ -158,35 +181,122 @@ def chat():
 
     # Process the conversation
     while True:
-        # Manage context window by keeping only essential messages
-        # Always keep the system message and the most recent user message
-        if len(messages) > 10:  # If conversation is getting long
-            # Keep system message, last 4 user-assistant exchanges, and current user message
-            # This preserves conversation flow while reducing context size
-            system_message = messages[0]  # System message is always first
-            recent_messages = messages[-9:]  # Last 4 exchanges (8 messages) + current user message
-            messages = [system_message] + recent_messages
+        # Token-based context window management
+        TOKEN_THRESHOLD = MAX_MODEL_TOKENS * 0.75 # Target 75% of max tokens for history
+        
+        if len(messages) > 1: # Only manage context if there's more than system prompt
+            system_message = messages[0]
+            last_user_message = messages[-1] # This should always be a user message
+            history_messages = messages[1:-1] # Messages between system and last user message
 
-            # Remove tool call details to save context space
-            for i, msg in enumerate(messages):
-                # Keep tool call results but simplify them
-                if msg.get("role") == "tool":
-                    # Truncate long tool results
-                    if "content" in msg and len(msg["content"]) > 500:
-                        msg["content"] = msg["content"][:500] + "\n[Content truncated to save context space]\n"
+            current_tokens = estimate_tokens(system_message.get("content", ""))
+            
+            new_messages_history = []
+
+            for msg in reversed(history_messages):
+                msg_tokens = 0
+                if msg.get("role") == "user":
+                    msg_tokens = estimate_tokens(msg.get("content", ""))
+                elif msg.get("role") == "assistant":
+                    content_tokens = estimate_tokens(msg.get("content", ""))
+                    tool_calls_str = json.dumps(msg.get("tool_calls", ""))
+                    tool_calls_tokens = estimate_tokens(tool_calls_str)
+                    msg_tokens = content_tokens + tool_calls_tokens
+                elif msg.get("role") == "tool":
+                    tool_content = msg.get("content", "")
+                    # Truncate long tool results before token estimation if they are very long
+                    if len(tool_content) > 2000: # Increased from 1000 to allow more detail
+                        tool_content = tool_content[:2000] + "\n[Content truncated to save context space]\n"
+                        msg["content"] = tool_content # Update message content if truncated
+                    msg_tokens = estimate_tokens(tool_content)
+                
+                if current_tokens + msg_tokens <= TOKEN_THRESHOLD:
+                    new_messages_history.insert(0, msg) # Prepend to keep order
+                    current_tokens += msg_tokens
+                else:
+                    # If adding this message exceeds threshold, stop including older messages
+                    if advanced_mode:
+                        response_data["debug_info"].append({
+                            "type": "context_management_info",
+                            "message": f"Context limit reached. Dropping message: {msg.get('role')} - Content: {msg.get('content', '')[:50]}"
+                        })
+                    break 
+            
+            # Always include the system message and the processed history
+            managed_messages = [system_message] + new_messages_history
+            
+            # Handle the last user message (current input)
+            last_user_message_tokens = estimate_tokens(last_user_message.get("content", ""))
+            
+            # Check if last user message alone is too big or makes total too big
+            # Max length for a single user message content to avoid breaking the LLM input processing
+            # This is a safeguard against extremely large individual messages.
+            MAX_SINGLE_MESSAGE_CHAR_LIMIT = int(MAX_MODEL_TOKENS * 3.5) # Approx max chars for one message
+            
+            if len(last_user_message.get("content", "")) > MAX_SINGLE_MESSAGE_CHAR_LIMIT:
+                last_user_message["content"] = last_user_message.get("content", "")[:MAX_SINGLE_MESSAGE_CHAR_LIMIT] + \
+                                               "\n[User message content truncated as it was excessively long]\n"
+                last_user_message_tokens = estimate_tokens(last_user_message.get("content", ""))
+                if advanced_mode:
+                    response_data["debug_info"].append({
+                        "type": "context_management_info",
+                        "message": "Last user message was truncated due to excessive length."
+                    })
+
+            # If last user message still makes it exceed, we might need to remove more from history
+            # For now, we'll allow it to slightly exceed TOKEN_THRESHOLD but not MAX_MODEL_TOKENS
+            # This loop ensures that if the last_user_message makes the total exceed MAX_MODEL_TOKENS,
+            # we try to remove from the *end* of new_messages_history (which are the oldest in that list)
+            while new_messages_history and (current_tokens + last_user_message_tokens > MAX_MODEL_TOKENS):
+                if advanced_mode:
+                    response_data["debug_info"].append({
+                        "type": "context_management_info",
+                        "message": f"Context still too large with last user message. Removing oldest history message: {new_messages_history[0].get('role')}"
+                    })
+                removed_msg = new_messages_history.pop(0) # remove from the start (oldest)
+                
+                # Recalculate tokens for removed message (similar to above)
+                removed_msg_tokens = 0
+                if removed_msg.get("role") == "user":
+                    removed_msg_tokens = estimate_tokens(removed_msg.get("content", ""))
+                elif removed_msg.get("role") == "assistant":
+                    content_tokens = estimate_tokens(removed_msg.get("content", ""))
+                    tool_calls_str = json.dumps(removed_msg.get("tool_calls", ""))
+                    tool_calls_tokens = estimate_tokens(tool_calls_str)
+                    removed_msg_tokens = content_tokens + tool_calls_tokens
+                elif removed_msg.get("role") == "tool":
+                     # Content would have been truncated already if needed by prior logic
+                    removed_msg_tokens = estimate_tokens(removed_msg.get("content", ""))
+                current_tokens -= removed_msg_tokens
+
+
+            managed_messages = [system_message] + new_messages_history
+            managed_messages.append(last_user_message)
+            messages = managed_messages
+            # Update current_tokens to reflect the final list of messages being sent
+            current_tokens += last_user_message_tokens # Add last user message tokens to the count
+        
+        # Update the estimated_tokens in response_data["context_usage"]
+        # This will be done after the LLM call using the final messages list.
+        # For now, current_tokens holds the sum for messages *before* LLM response.
 
         # Debug info for advanced mode
         if advanced_mode:
+            # Add a snapshot of messages *before* sending to LLM
+            # This should use a deepcopy if messages can be modified by llm_call, but llm_call takes a copy.
             response_data["debug_info"].append({
-                "type": "llm_input",
-                "content": messages
+                "type": "llm_input_after_context_management",
+                "content": messages,
+                "estimated_tokens_before_llm": current_tokens 
             })
 
         # Time the LLM call
         llm_start_time = time.time()
+        logger.info(f"Calling LLM for session_id: {session_id}. Message count: {len(messages)}")
         # Pass the computer_use_mode flag to the LLM call
         assistant_msg = llm_call(messages, computer_use_mode=(session_id in COMPUTER_USE_SESSIONS))
         llm_elapsed = time.time() - llm_start_time
+        logger.info(f"LLM call successful for session_id: {session_id}.")
 
         # Record LLM timing
         response_data["timing"]["llm_calls"].append(llm_elapsed)
@@ -207,6 +317,8 @@ def chat():
                     args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
                 except json.JSONDecodeError:
                     args = {}
+                
+                logger.info(f"Executing tool: {name} with args: {args} for session_id: {session_id}")
 
                 # Check if tool is enabled for this session
                 if session_id in TOOL_PREFERENCES and name in TOOL_PREFERENCES[session_id]:
@@ -278,9 +390,23 @@ def chat():
                         # Sanitize the result
                         tool_result_text = sanitize_tool_result(tool_result_text)
                     except Exception as e:
-                        tool_result_text = f"Error while executing {name}: {e}"
+                        error_payload = {
+                            "error_type": type(e).__name__,
+                            "error_message": str(e)
+                        }
+                        # For the execute_python tool, its own error handling already returns a dict.
+                        # Other tools might raise exceptions that are caught here.
+                        # We need to ensure tool_result_text is a string, so json.dumps if it's not already a string
+                        # from pretty_print_execute_python_results (which handles dicts from execute_python).
+                        # However, the goal is to standardize, so execute_python's direct return
+                        # will be handled by pretty_print_execute_python_results.
+                        # This catch block is for *other* tools that might raise an exception directly.
+                        tool_result_text = json.dumps({"error": error_payload})
+                        logger.error(f"Error executing tool {name} for session_id {session_id}: {e}", exc_info=True)
+
 
                 tool_elapsed = time.time() - tool_start_time
+                logger.info(f"Tool {name} execution finished. Result snippet: {tool_result_text[:100]}...")
 
                 # Record tool timing
                 response_data["timing"]["tool_calls"].append({
@@ -387,12 +513,21 @@ def chat():
         conversation_elapsed = time.time() - conversation_start_time
         response_data["timing"]["total"] = conversation_elapsed
 
-        # Calculate and add context window usage
-        # Estimate token count based on a simple heuristic (4 chars per token on average)
-        total_chars = sum(len(msg.get("content", "") or "") for msg in messages)
-        estimated_tokens = total_chars // 4
+        # Calculate and add context window usage based on the final set of messages sent to LLM
+        final_llm_input_tokens = 0
+        for msg in messages:
+            if msg.get("role") == "system":
+                final_llm_input_tokens += estimate_tokens(msg.get("content", ""))
+            elif msg.get("role") == "user":
+                final_llm_input_tokens += estimate_tokens(msg.get("content", ""))
+            elif msg.get("role") == "assistant":
+                final_llm_input_tokens += estimate_tokens(msg.get("content", "")) + \
+                                           estimate_tokens(json.dumps(msg.get("tool_calls", "")))
+            elif msg.get("role") == "tool":
+                final_llm_input_tokens += estimate_tokens(msg.get("content", ""))
+
         response_data["context_usage"] = {
-            "estimated_tokens": estimated_tokens,
+            "estimated_tokens": final_llm_input_tokens, # This is the sum of tokens for messages sent to LLM
             "max_tokens": MAX_MODEL_TOKENS
         }
 
@@ -421,6 +556,7 @@ def reset_conversation():
     """Reset the conversation for a session."""
     data = request.json
     session_id = data.get('session_id', 'default')
+    logger.info(f"Resetting conversation for session_id: {session_id}")
 
     if session_id in CONVERSATIONS:
         del CONVERSATIONS[session_id]
@@ -435,6 +571,7 @@ def reset_conversation():
 def manage_tools():
     """Get or update tool preferences."""
     session_id = request.args.get('session_id', 'default')
+    logger.info(f"Handling {request.method} /api/tools for session_id: {session_id}")
 
     if request.method == 'GET':
         # Return current tool preferences for the session, or defaults if none exist
@@ -508,4 +645,8 @@ def health_check():
     return jsonify({"status": "ok"})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    try:
+        app.run(debug=True, port=5000)
+    except Exception as e:
+        logger.critical(f"Flask app failed to start or crashed: {e}", exc_info=True)
+        raise
