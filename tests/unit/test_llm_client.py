@@ -183,3 +183,75 @@ class TestLLMClient(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+# New tests for temperature and max_tokens
+@patch('backend.llm_client.requests.post')
+def test_llm_call_uses_custom_temp_and_tokens(mock_post):
+    """Test llm_call uses provided temperature and max_tokens."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [{"message": {"role": "assistant", "content": "Test response"}}]}
+    mock_post.return_value = mock_response
+
+    custom_temp = 0.99
+    custom_tokens = 555
+    messages = [{"role": "user", "content": "Hello"}]
+
+    # Directly import llm_call and config values for these new tests
+    from backend.llm_client import llm_call
+    
+    llm_call(messages, temperature=custom_temp, max_tokens=custom_tokens)
+
+    assert mock_post.call_count == 1
+    called_args, called_kwargs = mock_post.call_args
+    request_payload = called_kwargs['json']
+
+    assert request_payload['temperature'] == custom_temp
+    assert request_payload['max_tokens'] == custom_tokens
+
+@patch('backend.llm_client.requests.post')
+def test_llm_call_uses_default_temp_and_tokens_if_none(mock_post):
+    """Test llm_call uses default temp/tokens if None are provided."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [{"message": {"role": "assistant", "content": "Test response"}}]}
+    mock_post.return_value = mock_response
+    messages = [{"role": "user", "content": "Hello"}]
+
+    # Directly import llm_call and config values for these new tests
+    from backend.llm_client import llm_call
+    from backend.config import DEFAULT_TEMPERATURE, DEFAULT_MAX_MODEL_TOKENS
+
+    llm_call(messages, temperature=None, max_tokens=None) # Explicitly pass None
+
+    assert mock_post.call_count == 1
+    called_args, called_kwargs = mock_post.call_args
+    request_payload = called_kwargs['json']
+    # The retry logic adds a small amount (0.05 * retries) if retries > 0.
+    # For the first attempt (retries=0), temp_adjustment is 0.
+    assert request_payload['temperature'] == DEFAULT_TEMPERATURE
+    assert request_payload['max_tokens'] == DEFAULT_MAX_MODEL_TOKENS
+
+@patch('backend.llm_client.requests.post')
+def test_llm_call_uses_default_temp_and_tokens_implicitly(mock_post):
+    """Test llm_call uses default temp/tokens if arguments are not passed."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [{"message": {"role": "assistant", "content": "Test response"}}]}
+    mock_post.return_value = mock_response
+    messages = [{"role": "user", "content": "Hello"}]
+
+    # Directly import llm_call and config values for these new tests
+    from backend.llm_client import llm_call
+    from backend.config import DEFAULT_TEMPERATURE, DEFAULT_MAX_MODEL_TOKENS
+    
+    llm_call(messages) # Not passing temp/tokens
+
+    assert mock_post.call_count == 1
+    called_args, called_kwargs = mock_post.call_args
+    request_payload = called_kwargs['json']
+    assert request_payload['temperature'] == DEFAULT_TEMPERATURE
+    assert request_payload['max_tokens'] == DEFAULT_MAX_MODEL_TOKENS
