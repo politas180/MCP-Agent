@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import requests
 
-from config import LMSTUDIO_HOST, LMSTUDIO_MODEL, MAX_MODEL_TOKENS, TEMPERATURE
+from config import LMSTUDIO_HOST, LMSTUDIO_MODEL, DEFAULT_MAX_MODEL_TOKENS, DEFAULT_TEMPERATURE
 from tools import TOOLS
 from computer_use import COMPUTER_TOOLS
 
@@ -30,7 +30,7 @@ def clean_llm_response(response: Dict[str, Any]) -> Dict[str, Any]:
 
     return response
 
-def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_mode: bool = False) -> Dict[str, Any]:
+def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_mode: bool = False, temperature: float | None = None, max_tokens: int | None = None) -> Dict[str, Any]:
     """Send a chat/completions request and return the assistant message.
 
     Args:
@@ -70,7 +70,9 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
         try:
             # If this is a retry, slightly adjust the temperature to get a different response
             temp_adjustment = 0.05 * retries
-            current_temp = max(0.1, min(0.9, TEMPERATURE + temp_adjustment))
+            final_temperature = temperature if temperature is not None else DEFAULT_TEMPERATURE
+            final_max_tokens = max_tokens if max_tokens is not None else DEFAULT_MAX_MODEL_TOKENS
+            current_temp = max(0.1, min(0.9, final_temperature + temp_adjustment))
 
             # Select the appropriate tools based on mode
             tools_to_use = COMPUTER_TOOLS if computer_use_mode else TOOLS
@@ -82,7 +84,7 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
                     "messages": cleaned_messages,
                     "tools": tools_to_use,
                     "stream": False,
-                    "max_tokens": MAX_MODEL_TOKENS,
+                    "max_tokens": final_max_tokens,
                     "temperature": current_temp,
                 },
                 timeout=60,

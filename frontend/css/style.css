@@ -464,6 +464,75 @@ body.tools-visible .tools-panel {
     display: block;
 }
 
+/* LLM Settings panel */
+.llm-settings-panel {
+    display: none; /* Hidden by default */
+    background-color: var(--chat-bg);
+    border-top: 1px solid var(--border-color);
+    padding: 15px;
+}
+
+body.llm-settings-visible .llm-settings-panel {
+    display: block; /* Shown when class is on body */
+}
+
+.llm-settings-panel h3 {
+    font-size: 14px;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+}
+
+.llm-settings-panel .panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.llm-settings-panel .setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.llm-settings-panel .setting-item label {
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.llm-settings-panel .setting-item input[type="number"] {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.llm-settings-panel .setting-item span {
+    font-size: 0.85em;
+    color: var(--light-text);
+    margin-left: 5px;
+}
+
+.llm-settings-panel #save-llm-settings-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    align-self: flex-start; /* Align button to the left */
+}
+
+.llm-settings-panel #save-llm-settings-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.llm-settings-panel .settings-note {
+    font-size: 0.85em;
+    color: var(--light-text);
+    margin-top: 10px;
+}
+
 /* Loading indicator */
 .loading {
     display: inline-block;

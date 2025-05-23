@@ -16,7 +16,7 @@ from flask_cors import CORS
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from llm_client import llm_call
-from config import MAX_MODEL_TOKENS
+from config import DEFAULT_MAX_MODEL_TOKENS, DEFAULT_TEMPERATURE
 from tools import (TOOL_IMPLS, TOOLS, pretty_print_search_results,
                   pretty_print_wiki_results, pretty_print_weather_results,
                   pretty_print_calculator_results)
@@ -37,6 +37,9 @@ CONVERSATIONS = {}
 
 # Default tool preferences (all enabled by default)
 TOOL_PREFERENCES = {}
+
+# LLM settings per session
+LLM_SETTINGS = {}
 
 # Computer Use mode sessions
 COMPUTER_USE_SESSIONS = set()
@@ -115,6 +118,17 @@ def chat():
     advanced_mode = data.get('advanced_mode', False)
     computer_use_mode = data.get('computer_use_mode', False)
 
+    # Get LLM settings for the session
+    if session_id not in LLM_SETTINGS:
+        # Initialize with defaults if not set for the session
+        LLM_SETTINGS[session_id] = {
+            "temperature": DEFAULT_TEMPERATURE,
+            "max_tokens": DEFAULT_MAX_MODEL_TOKENS
+        }
+    current_llm_settings = LLM_SETTINGS[session_id]
+    session_temperature = current_llm_settings.get("temperature", DEFAULT_TEMPERATURE)
+    session_max_tokens = current_llm_settings.get("max_tokens", DEFAULT_MAX_MODEL_TOKENS)
+
     # Update tool preferences if provided
     tool_preferences = data.get('tool_preferences', None)
     if tool_preferences and isinstance(tool_preferences, dict):
@@ -185,7 +199,12 @@ def chat():
         # Time the LLM call
         llm_start_time = time.time()
         # Pass the computer_use_mode flag to the LLM call
-        assistant_msg = llm_call(messages, computer_use_mode=(session_id in COMPUTER_USE_SESSIONS))
+        assistant_msg = llm_call(
+            messages,
+            computer_use_mode=(session_id in COMPUTER_USE_SESSIONS),
+            temperature=session_temperature,
+            max_tokens=session_max_tokens
+        )
         llm_elapsed = time.time() - llm_start_time
 
         # Record LLM timing
@@ -393,7 +412,7 @@ def chat():
         estimated_tokens = total_chars // 4
         response_data["context_usage"] = {
             "estimated_tokens": estimated_tokens,
-            "max_tokens": MAX_MODEL_TOKENS
+            "max_tokens": session_max_tokens # Changed from MAX_MODEL_TOKENS
         }
 
         # Clean up the final message content before adding to the response
@@ -428,6 +447,10 @@ def reset_conversation():
     # Reset tool preferences to defaults (all enabled)
     if session_id in TOOL_PREFERENCES:
         TOOL_PREFERENCES[session_id] = {tool['function']['name']: True for tool in TOOLS}
+
+    # Reset LLM settings to defaults
+    if session_id in LLM_SETTINGS:
+        del LLM_SETTINGS[session_id] # This will cause it to be re-initialized with defaults on next use
 
     return jsonify({"status": "success", "message": "Conversation reset"})
 
@@ -506,6 +529,47 @@ def computer_use_tools():
 def health_check():
     """Health check endpoint."""
     return jsonify({"status": "ok"})
+
+@app.route('/api/llm-settings', methods=['GET', 'POST'])
+def llm_settings():
+    session_id = request.args.get('session_id', 'default')
+
+    if request.method == 'GET':
+        if session_id not in LLM_SETTINGS:
+            # Initialize with defaults if not set for the session
+            LLM_SETTINGS[session_id] = {
+                "temperature": DEFAULT_TEMPERATURE,
+                "max_tokens": DEFAULT_MAX_MODEL_TOKENS
+            }
+        return jsonify({
+            "status": "success",
+            "settings": LLM_SETTINGS[session_id]
+        })
+
+    elif request.method == 'POST':
+        data = request.json
+        settings_data = data.get('settings', {})
+
+        if not settings_data or not isinstance(settings_data, dict):
+            return jsonify({"error": "Invalid settings data"}), 400
+
+        if session_id not in LLM_SETTINGS:
+            # Initialize with defaults before updating
+            LLM_SETTINGS[session_id] = {
+                "temperature": DEFAULT_TEMPERATURE,
+                "max_tokens": DEFAULT_MAX_MODEL_TOKENS
+            }
+
+        # Update only provided and valid settings
+        if "temperature" in settings_data and isinstance(settings_data["temperature"], (float, int)):
+            LLM_SETTINGS[session_id]["temperature"] = float(settings_data["temperature"])
+        if "max_tokens" in settings_data and isinstance(settings_data["max_tokens"], int):
+            LLM_SETTINGS[session_id]["max_tokens"] = int(settings_data["max_tokens"])
+
+        return jsonify({
+            "status": "success",
+            "settings": LLM_SETTINGS[session_id]
+        })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

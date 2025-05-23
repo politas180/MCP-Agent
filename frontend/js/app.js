@@ -20,6 +20,13 @@ const toolsButton = document.getElementById('tools-button');
 const toolsPanel = document.getElementById('tools-panel');
 const toolsContent = document.getElementById('tools-content');
 const computerUseButton = document.getElementById('computer-use-button');
+const llmSettingsButton = document.getElementById('llm-settings-button');
+const llmSettingsPanel = document.getElementById('llm-settings-panel');
+const temperatureInput = document.getElementById('temperature-input');
+const temperatureValueDisplay = document.getElementById('temperature-value-display');
+const maxTokensInput = document.getElementById('max-tokens-input');
+const maxTokensValueDisplay = document.getElementById('max-tokens-value-display');
+const saveLLMSettingsButton = document.getElementById('save-llm-settings-button');
 const contextUsageText = document.querySelector('.context-usage-text');
 const contextUsageFill = document.querySelector('.context-usage-fill');
 
@@ -27,9 +34,11 @@ const contextUsageFill = document.querySelector('.context-usage-fill');
 let isAdvancedMode = false;
 let isProcessing = false;
 let isToolsPanelVisible = false;
+let isLLMSettingsPanelVisible = false;
 let isComputerUseMode = false;
 let sessionId = getOrCreateSessionId();
 let toolPreferences = {}; // Will store tool preferences
+let llmSettings = {}; // Will store temperature and max_tokens
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', initializeApp);
@@ -40,6 +49,10 @@ modeSwitch.addEventListener('change', toggleAdvancedMode);
 clearDebugButton.addEventListener('click', clearDebugInfo);
 toolsButton.addEventListener('click', toggleToolsPanel);
 computerUseButton.addEventListener('click', toggleComputerUseMode);
+llmSettingsButton.addEventListener('click', toggleLLMSettingsPanel);
+saveLLMSettingsButton.addEventListener('click', saveLLMSettings);
+temperatureInput.addEventListener('input', () => temperatureValueDisplay.textContent = temperatureInput.value);
+maxTokensInput.addEventListener('input', () => maxTokensValueDisplay.textContent = maxTokensInput.value);
 
 // Initialize the application
 function initializeApp() {
@@ -70,6 +83,9 @@ function initializeApp() {
 
     // Load tool preferences
     loadToolPreferences();
+
+    // Load LLM settings
+    loadLLMSettings();
 
     // Initialize highlight.js
     hljs.configure({
@@ -514,6 +530,9 @@ async function resetConversation(updateUI = true) {
             // Reset tool preferences
             loadToolPreferences();
 
+            // Reload LLM settings to reflect defaults
+            loadLLMSettings();
+
             setStatusMessage('Conversation reset');
         }
     } catch (error) {
@@ -783,4 +802,92 @@ function getToolDescription(toolName) {
     };
 
     return descriptions[toolName] || 'Tool for ' + toolName.replace(/_/g, ' ');
+}
+
+// Toggle LLM Settings panel visibility
+function toggleLLMSettingsPanel() {
+    isLLMSettingsPanelVisible = !isLLMSettingsPanelVisible;
+    document.body.classList.toggle('llm-settings-visible', isLLMSettingsPanelVisible);
+    // Optional: save visibility state to localStorage if desired
+    // localStorage.setItem('llm_settings_panel_visible', isLLMSettingsPanelVisible);
+    if (isLLMSettingsPanelVisible && Object.keys(llmSettings).length === 0) {
+        loadLLMSettings(); // Load settings when panel is first opened if not already loaded
+    }
+}
+
+// Load LLM settings from the server
+async function loadLLMSettings() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/llm-settings?session_id=${sessionId}`);
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.status === 'success' && data.settings) {
+            llmSettings = data.settings;
+            updateLLMSettingsUI();
+        } else {
+            console.error('Invalid response format from llm-settings endpoint');
+            setStatusMessage('Error loading LLM settings', 'error');
+            // Fallback to default values if loading fails
+            llmSettings = { temperature: 0.2, max_tokens: 8000 }; // Default fallback
+            updateLLMSettingsUI();
+        }
+    } catch (error) {
+        console.error('Error loading LLM settings:', error);
+        setStatusMessage(`Error loading LLM settings: ${error.message}`, 'error');
+        // Fallback to default values if loading fails
+        llmSettings = { temperature: 0.2, max_tokens: 8000 }; // Default fallback
+        updateLLMSettingsUI();
+    }
+}
+
+// Update the LLM settings UI elements
+function updateLLMSettingsUI() {
+    if (llmSettings.temperature !== undefined) {
+        temperatureInput.value = llmSettings.temperature;
+        temperatureValueDisplay.textContent = llmSettings.temperature;
+    }
+    if (llmSettings.max_tokens !== undefined) {
+        maxTokensInput.value = llmSettings.max_tokens;
+        maxTokensValueDisplay.textContent = llmSettings.max_tokens;
+    }
+}
+
+// Save LLM settings to the server
+async function saveLLMSettings() {
+    const newSettings = {
+        temperature: parseFloat(temperatureInput.value),
+        max_tokens: parseInt(maxTokensInput.value, 10)
+    };
+
+    if (isNaN(newSettings.temperature) || isNaN(newSettings.max_tokens)) {
+        setStatusMessage('Invalid LLM settings values.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/llm-settings?session_id=${sessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ settings: newSettings })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.status === 'success' && data.settings) {
+            llmSettings = data.settings;
+            updateLLMSettingsUI();
+            setStatusMessage('LLM settings saved.', 'success');
+        } else {
+            setStatusMessage('Error saving LLM settings.', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving LLM settings:', error);
+        setStatusMessage(`Error saving LLM settings: ${error.message}`, 'error');
+    }
 }
