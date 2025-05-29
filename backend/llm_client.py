@@ -80,22 +80,51 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
             # Select the appropriate tools based on mode
             tools_to_use = COMPUTER_TOOLS if computer_use_mode else TOOLS
 
-            resp = client.chat(
+            # Change stream to True to enable streaming responses
+            stream_response = client.chat(
                 model=OLLAMA_MODEL,
                 messages=cleaned_messages,
                 tools=tools_to_use,
-                stream=False,
+                stream=True,
                 options={
                     'num_predict': final_max_tokens,
                     'temperature': current_temp,
                 }
             )
             
-            # Extract the message from the response
-            response = resp.message
+            # Initialize variables to aggregate the response
+            aggregated_content = ""
+            aggregated_tool_calls = []
+            role = "assistant"  # The role will always be 'assistant'
+            
+            # Iterate through the streamed response chunks
+            for chunk in stream_response:
+                # Extract the message from the chunk
+                chunk_message = chunk.message
+                
+                # Aggregate content
+                if hasattr(chunk_message, 'content') and chunk_message.content:
+                    aggregated_content += chunk_message.content
+                
+                # Aggregate tool calls
+                if hasattr(chunk_message, 'tool_calls') and chunk_message.tool_calls:
+                    # Add any new tool calls to our aggregated list
+                    for tool_call in chunk_message.tool_calls:
+                        if tool_call not in aggregated_tool_calls:
+                            aggregated_tool_calls.append(tool_call)
+            
+            # Construct the aggregated response message
+            response_message = {
+                "role": role,
+                "content": aggregated_content
+            }
+            
+            # Add tool_calls if there are any
+            if aggregated_tool_calls:
+                response_message["tool_calls"] = aggregated_tool_calls
             
             # Check if the response has problematic tokens
-            if "content" in response and response["content"] and "<|im_" in response["content"]:
+            if "<|im_" in aggregated_content:
                 print(f"Detected problematic tokens in response, retrying ({retries+1}/{max_retries+1})")
                 retries += 1
                 if retries > max_retries:
@@ -103,7 +132,7 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
                 continue
 
             # Clean up the response
-            return clean_llm_response(response)
+            return clean_llm_response(response_message)
 
         except Exception as e:
             last_error = e

@@ -22,16 +22,22 @@ class TestLLMClient(unittest.TestCase):
 
     @patch('llm_client.ollama.Client')
     def test_llm_call_success(self, mock_client_class):
-        """Test that the LLM call function works correctly."""
-        # Set up the mock
+        """Test that the LLM call function works correctly with streaming."""
+        # Set up the mock client instance
         mock_client_instance = mock_client_class.return_value
-        mock_response = MagicMock()
-        mock_response.message = {
-            "role": "assistant",
-            "content": "Hello, how can I help you today?",
-            "tool_calls": []
-        }
-        mock_client_instance.chat.return_value = mock_response
+        
+        # Create mock chunks that will be returned by the streaming response
+        chunk1 = MagicMock()
+        chunk1.message = MagicMock(role="assistant", content="Hello, ", tool_calls=None)
+        
+        chunk2 = MagicMock()
+        chunk2.message = MagicMock(role="assistant", content="how can ", tool_calls=None)
+        
+        chunk3 = MagicMock()
+        chunk3.message = MagicMock(role="assistant", content="I help you today?", tool_calls=None)
+        
+        # Set the chat method to return the iterable of chunks
+        mock_client_instance.chat.return_value = [chunk1, chunk2, chunk3]
         
         # Call the function
         messages = [
@@ -41,7 +47,7 @@ class TestLLMClient(unittest.TestCase):
         
         result = llm_client.llm_call(messages)
         
-        # Verify the result
+        # Verify the result contains the aggregated content
         self.assertEqual(result["role"], "assistant")
         self.assertEqual(result["content"], "Hello, how can I help you today?")
         
@@ -50,34 +56,40 @@ class TestLLMClient(unittest.TestCase):
         args, kwargs = mock_client_instance.chat.call_args
         self.assertEqual(kwargs["model"], llm_client.OLLAMA_MODEL)
         self.assertEqual(kwargs["messages"], messages)
-        self.assertEqual(kwargs["stream"], False)
+        self.assertEqual(kwargs["stream"], True)  # Now using streaming
         self.assertEqual(kwargs["options"]["temperature"], llm_client.DEFAULT_TEMPERATURE)
         self.assertEqual(kwargs["options"]["num_predict"], llm_client.DEFAULT_MAX_MODEL_TOKENS)
 
     @patch('llm_client.ollama.Client')
     def test_llm_call_with_tool_calls(self, mock_client_class):
-        """Test that the LLM call function handles tool calls correctly."""
-        # Set up the mock
+        """Test that the LLM call function handles tool calls correctly with streaming."""
+        # Set up the mock client instance
         mock_client_instance = mock_client_class.return_value
-        mock_response = MagicMock()
-        mock_response.message = {
-            "role": "assistant",
-            "content": "I'll search for information about Python.",
-            "tool_calls": [
-                {
-                    "id": "call_123",
-                    "type": "function",
-                    "function": {
-                        "name": "search",
-                        "arguments": json.dumps({
-                            "query": "Python programming language",
-                            "max_results": 3
-                        })
-                    }
-                }
-            ]
+        
+        # Create mock chunks with content and tool calls
+        chunk1 = MagicMock()
+        chunk1.message = MagicMock(role="assistant", content="I'll search ", tool_calls=None)
+        
+        chunk2 = MagicMock()
+        chunk2.message = MagicMock(role="assistant", content="for information about Python.", tool_calls=None)
+        
+        # Chunk with tool call
+        tool_call = {
+            "id": "call_123",
+            "type": "function",
+            "function": {
+                "name": "search",
+                "arguments": json.dumps({
+                    "query": "Python programming language",
+                    "max_results": 3
+                })
+            }
         }
-        mock_client_instance.chat.return_value = mock_response
+        chunk3 = MagicMock()
+        chunk3.message = MagicMock(role="assistant", content="", tool_calls=[tool_call])
+        
+        # Set the chat method to return the iterable of chunks
+        mock_client_instance.chat.return_value = [chunk1, chunk2, chunk3]
         
         # Call the function
         messages = [
@@ -87,7 +99,7 @@ class TestLLMClient(unittest.TestCase):
         
         result = llm_client.llm_call(messages)
         
-        # Verify the result
+        # Verify the result contains the aggregated content and tool calls
         self.assertEqual(result["role"], "assistant")
         self.assertEqual(result["content"], "I'll search for information about Python.")
         
@@ -98,18 +110,21 @@ class TestLLMClient(unittest.TestCase):
 
     @patch('llm_client.ollama.Client')
     def test_llm_call_retry_on_error(self, mock_client_class):
-        """Test that the LLM call function retries on error."""
-        # Set up the mock to fail on first call and succeed on second
+        """Test that the LLM call function retries on error with streaming."""
+        # Set up the mock client instance
         mock_client_instance = mock_client_class.return_value
         
-        # First call raises an exception
+        # Create successful mock chunks for the second attempt
+        chunk1 = MagicMock()
+        chunk1.message = MagicMock(role="assistant", content="Hello, ", tool_calls=None)
+        
+        chunk2 = MagicMock()
+        chunk2.message = MagicMock(role="assistant", content="how can I help you today?", tool_calls=None)
+        
+        # First call raises an exception, second call returns chunks
         mock_client_instance.chat.side_effect = [
             Exception("API error"),
-            MagicMock(message={
-                "role": "assistant",
-                "content": "Hello, how can I help you today?",
-                "tool_calls": []
-            })
+            [chunk1, chunk2]
         ]
         
         # Call the function
@@ -120,7 +135,7 @@ class TestLLMClient(unittest.TestCase):
         
         result = llm_client.llm_call(messages)
         
-        # Verify the result
+        # Verify the result contains the aggregated content
         self.assertEqual(result["role"], "assistant")
         self.assertEqual(result["content"], "Hello, how can I help you today?")
         
@@ -129,7 +144,7 @@ class TestLLMClient(unittest.TestCase):
 
     @patch('llm_client.ollama.Client')
     def test_llm_call_max_retries_exceeded(self, mock_client_class):
-        """Test that the LLM call function handles max retries exceeded."""
+        """Test that the LLM call function handles max retries exceeded with streaming."""
         # Set up the mock to always fail
         mock_client_instance = mock_client_class.return_value
         mock_client_instance.chat.side_effect = Exception("API error")
@@ -150,15 +165,58 @@ class TestLLMClient(unittest.TestCase):
         # Verify the mock was called the expected number of times
         self.assertEqual(mock_client_instance.chat.call_count, 1)  # Initial call only, no retries
 
+    @patch('llm_client.ollama.Client')
+    def test_llm_call_problematic_tokens(self, mock_client_class):
+        """Test that the LLM call function retries when problematic tokens are detected."""
+        # Set up the mock client instance
+        mock_client_instance = mock_client_class.return_value
+        
+        # Create mock chunks with problematic tokens for the first attempt
+        bad_chunk1 = MagicMock()
+        bad_chunk1.message = MagicMock(role="assistant", content="<|im_start|>", tool_calls=None)
+        
+        bad_chunk2 = MagicMock()
+        bad_chunk2.message = MagicMock(role="assistant", content="This has problematic tokens", tool_calls=None)
+        
+        # Create successful mock chunks for the second attempt
+        good_chunk1 = MagicMock()
+        good_chunk1.message = MagicMock(role="assistant", content="Hello, ", tool_calls=None)
+        
+        good_chunk2 = MagicMock()
+        good_chunk2.message = MagicMock(role="assistant", content="this is a clean response.", tool_calls=None)
+        
+        # First call returns chunks with problematic tokens, second call returns clean chunks
+        mock_client_instance.chat.side_effect = [
+            [bad_chunk1, bad_chunk2],
+            [good_chunk1, good_chunk2]
+        ]
+        
+        # Call the function
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Hello"}
+        ]
+        
+        result = llm_client.llm_call(messages, max_retries=1)
+        
+        # Verify the result contains the clean, aggregated content
+        self.assertEqual(result["role"], "assistant")
+        self.assertEqual(result["content"], "Hello, this is a clean response.")
+        
+        # Verify the mock was called twice
+        self.assertEqual(mock_client_instance.chat.call_count, 2)
+
 
 # New tests for temperature and max_tokens
 @patch('llm_client.ollama.Client')
 def test_llm_call_uses_custom_temp_and_tokens(mock_client_class):
-    """Test llm_call uses provided temperature and max_tokens."""
+    """Test llm_call uses provided temperature and max_tokens with streaming."""
     mock_client_instance = mock_client_class.return_value
-    mock_response = MagicMock()
-    mock_response.message = {"role": "assistant", "content": "Test response"}
-    mock_client_instance.chat.return_value = mock_response
+    
+    # Create mock chunks
+    chunk = MagicMock()
+    chunk.message = MagicMock(role="assistant", content="Test response", tool_calls=None)
+    mock_client_instance.chat.return_value = [chunk]
 
     custom_temp = 0.99
     custom_tokens = 555
@@ -175,14 +233,18 @@ def test_llm_call_uses_custom_temp_and_tokens(mock_client_class):
 
     assert options['temperature'] == custom_temp
     assert options['num_predict'] == custom_tokens
+    assert called_kwargs['stream'] == True  # Verify streaming is enabled
 
 @patch('llm_client.ollama.Client')
 def test_llm_call_uses_default_temp_and_tokens_if_none(mock_client_class):
-    """Test llm_call uses default temp/tokens if None are provided."""
+    """Test llm_call uses default temp/tokens if None are provided with streaming."""
     mock_client_instance = mock_client_class.return_value
-    mock_response = MagicMock()
-    mock_response.message = {"role": "assistant", "content": "Test response"}
-    mock_client_instance.chat.return_value = mock_response
+    
+    # Create mock chunks
+    chunk = MagicMock()
+    chunk.message = MagicMock(role="assistant", content="Test response", tool_calls=None)
+    mock_client_instance.chat.return_value = [chunk]
+    
     messages = [{"role": "user", "content": "Hello"}]
 
     # Directly import llm_call and config values for these new tests
@@ -198,14 +260,18 @@ def test_llm_call_uses_default_temp_and_tokens_if_none(mock_client_class):
     # For the first attempt (retries=0), temp_adjustment is 0.
     assert options['temperature'] == DEFAULT_TEMPERATURE
     assert options['num_predict'] == DEFAULT_MAX_MODEL_TOKENS
+    assert called_kwargs['stream'] == True  # Verify streaming is enabled
 
 @patch('llm_client.ollama.Client')
 def test_llm_call_uses_default_temp_and_tokens_implicitly(mock_client_class):
-    """Test llm_call uses default temp/tokens if arguments are not passed."""
+    """Test llm_call uses default temp/tokens if arguments are not passed with streaming."""
     mock_client_instance = mock_client_class.return_value
-    mock_response = MagicMock()
-    mock_response.message = {"role": "assistant", "content": "Test response"}
-    mock_client_instance.chat.return_value = mock_response
+    
+    # Create mock chunks
+    chunk = MagicMock()
+    chunk.message = MagicMock(role="assistant", content="Test response", tool_calls=None)
+    mock_client_instance.chat.return_value = [chunk]
+    
     messages = [{"role": "user", "content": "Hello"}]
 
     # Directly import llm_call and config values for these new tests
@@ -219,3 +285,4 @@ def test_llm_call_uses_default_temp_and_tokens_implicitly(mock_client_class):
     options = called_kwargs['options']
     assert options['temperature'] == DEFAULT_TEMPERATURE
     assert options['num_predict'] == DEFAULT_MAX_MODEL_TOKENS
+    assert called_kwargs['stream'] == True  # Verify streaming is enabled
