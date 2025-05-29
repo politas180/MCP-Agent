@@ -1,13 +1,13 @@
-"""Thin wrapper around LM Studio's OpenAI‑compatible HTTP API."""
+"""Thin wrapper around Ollama's Python API."""
 from __future__ import annotations
 
 import re
 import time
 from typing import Any, Dict, List
 
-import requests
+import ollama
 
-from config import LMSTUDIO_HOST, LMSTUDIO_MODEL, DEFAULT_MAX_MODEL_TOKENS, DEFAULT_TEMPERATURE
+from config import OLLAMA_HOST, OLLAMA_MODEL, DEFAULT_MAX_MODEL_TOKENS, DEFAULT_TEMPERATURE
 from tools import TOOLS
 from computer_use import COMPUTER_TOOLS
 
@@ -65,6 +65,9 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
     # Try the request with retries
     retries = 0
     last_error = None
+    
+    # Initialize Ollama client
+    client = ollama.Client(host=OLLAMA_HOST)
 
     while retries <= max_retries:
         try:
@@ -77,22 +80,20 @@ def llm_call(messages: List[Dict[str, Any]], max_retries: int = 2, computer_use_
             # Select the appropriate tools based on mode
             tools_to_use = COMPUTER_TOOLS if computer_use_mode else TOOLS
 
-            resp = requests.post(
-                f"{LMSTUDIO_HOST}/v1/chat/completions",
-                json={
-                    "model": LMSTUDIO_MODEL,
-                    "messages": cleaned_messages,
-                    "tools": tools_to_use,
-                    "stream": False,
-                    "max_tokens": final_max_tokens,
-                    "temperature": current_temp,
-                },
-                timeout=60,
+            resp = client.chat(
+                model=OLLAMA_MODEL,
+                messages=cleaned_messages,
+                tools=tools_to_use,
+                stream=False,
+                options={
+                    'num_predict': final_max_tokens,
+                    'temperature': current_temp,
+                }
             )
-            resp.raise_for_status()
-            data = resp.json()
-            response = data["choices"][0]["message"]  # type: ignore[index]
-
+            
+            # Extract the message from the response
+            response = resp.message
+            
             # Check if the response has problematic tokens
             if "content" in response and response["content"] and "<|im_" in response["content"]:
                 print(f"Detected problematic tokens in response, retrying ({retries+1}/{max_retries+1})")
